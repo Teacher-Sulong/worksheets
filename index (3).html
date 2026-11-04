@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>슬옹쌤 맞춤형 학습지 생성기 모음</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+    body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; }
+    .card { transition: transform .15s ease, box-shadow .15s ease; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(15,23,42,.35); }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+  <header class="bg-slate-900 text-white shadow-md py-5 px-6">
+    <div class="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center gap-3">
+        <i data-lucide="library" class="w-9 h-9 text-yellow-300"></i>
+        <div>
+          <h1 class="text-2xl font-black tracking-tight">맞춤형 학습지 생성기 모음</h1>
+          <p class="text-xs text-slate-300">교과별 학습지 자동 생성 도구를 한곳에서 · <b class="text-yellow-200">made by 특수교사 슬옹쌤</b></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-slate-200 bg-white/10 px-3 py-2 rounded-lg">
+        <i data-lucide="info" class="w-4 h-4"></i>
+        <span>카드를 누르면 생성기가 열려요.</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 space-y-5">
+    <!-- 요약 -->
+    <section id="summary" class="grid grid-cols-2 md:grid-cols-4 gap-3"></section>
+
+    <!-- 과목 탭 + 검색 -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
+      <div id="subject-tabs" class="flex flex-wrap gap-2"></div>
+      <div class="flex flex-col md:flex-row gap-2">
+        <div class="relative flex-1">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+          <input id="q" type="text" placeholder="생성기 이름이나 내용으로 찾기 (예: 거스름돈, 수직선, 좌표)" class="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-slate-400 focus:outline-none">
+        </div>
+        <select id="school" class="rounded-lg border border-slate-200 px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-slate-400 focus:outline-none">
+          <option value="">모든 학교급</option>
+          <option value="초등">초등</option>
+          <option value="중학교">중학교</option>
+          <option value="고등학교">고등학교</option>
+        </select>
+        <label class="flex items-center gap-2 text-sm text-slate-600 px-2 cursor-pointer select-none">
+          <input id="favonly" type="checkbox" class="w-4 h-4 rounded"> <span>즐겨찾기만</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- 목록 -->
+    <section id="list" class="space-y-6"></section>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs mt-10">
+    <p>© 2026 맞춤형 학습지 생성기 모음 · <b class="text-slate-200">made by 특수교사 슬옹쌤</b></p>
+  </footer>
+
+  <script>
+    // ════════ 새 생성기를 추가할 때는 아래 두 목록만 고치면 됩니다 ════════
+    // 과목: id, 이름, 아이콘(lucide), 색
+    const SUBJECTS = [
+      { id: 'math',   name: '수학', icon: 'calculator',  color: 'sky' },
+      { id: 'korean', name: '국어', icon: 'book-open',   color: 'rose' },
+      { id: 'art',    name: '미술', icon: 'palette',     color: 'violet' },
+      { id: 'life',   name: '생활·기타', icon: 'sparkles', color: 'emerald' }
+    ];
+    // 생성기: subject는 위 과목 id와 같아야 해요
+    const GENERATORS = [
+      { subject: 'math', title: '시계보기', icon: 'clock', color: 'sky',
+        desc: '시각 읽기·바늘 그리기, 경과 시간, 오전·오후, 시간표·버스 시간표',
+        levels: '9단계', types: 14, school: ['초등'], grade: '초1~3', updated: '2026-11-04',
+        url: 'clock.html' },
+      { subject: 'math', title: '달력보기', icon: 'calendar-days', color: 'green',
+        desc: '날짜·요일 읽기, 며칠 후·전, 주·개월·년 단위, 윤년, 반복 일정, 나이 계산',
+        levels: '유형별', types: 21, school: ['초등'], grade: '초1~3', updated: '2026-11-04',
+        url: 'calendar.html' },
+      { subject: 'math', title: '돈세기', icon: 'coins', color: 'amber',
+        desc: '동전·지폐 알기, 모두 얼마, 바꾸기, 큰 돈부터 내기, 물건 사기·거스름돈',
+        levels: '7단계', types: 14, school: ['초등'], grade: '초1~4 · 기능적 수학', updated: '2026-11-04',
+        url: 'money.html' },
+      { subject: 'math', title: '수 배열표·수직선', icon: 'grid-3x3', color: 'indigo',
+        desc: '100칸 배열표, 수직선 빈칸·점 읽기·표시, 뛰어 세기, 크기 순서 (소수·음수 포함)',
+        levels: '8단계', types: 11, school: ['초등', '중학교'], grade: '초1~중1', updated: '2026-11-04',
+        url: 'numberline.html' },
+      { subject: 'math', title: '단위·눈금읽기', icon: 'ruler', color: 'teal',
+        desc: 'cm·mm·m·g·kg·t·mL·L 단위 알기, 자·줄자·저울·계량컵 눈금, 단위 바꾸기',
+        levels: '6단계', types: 12, school: ['초등'], grade: '초2~4', updated: '2026-11-04',
+        url: 'unit.html' },
+      { subject: 'math', title: '규칙찾기', icon: 'shapes', color: 'purple',
+        desc: '모양·색 반복 규칙, N번째 모양, 수 규칙, 늘어나는 모양, 규칙과 대응',
+        levels: '8단계', types: 10, school: ['초등'], grade: '초1~6', updated: '2026-11-04',
+        url: 'pattern.html' },
+      { subject: 'math', title: '그래프 읽기', icon: 'bar-chart-3', color: 'rose',
+        desc: '분류하기, 표·그림그래프·막대그래프·꺾은선그래프·띠그래프·원그래프',
+        levels: '7단계', types: 9, school: ['초등'], grade: '초1~6', updated: '2026-11-04',
+        url: 'graph.html' },
+      { subject: 'math', title: '좌표평면', icon: 'map-pin', color: 'cyan',
+        desc: '칸 수로 위치 말하기, 좌표 읽기·찍기, 도형·거리·이동, 사분면, 정비례 그래프, 대칭이동',
+        levels: '7단계', types: 12, school: ['초등', '중학교', '고등학교'], grade: '초5~고1', updated: '2026-11-04',
+        url: 'coordinate.html' }
+    ];
+
+    // ════════ 아래는 화면 그리기 ════════
+    const C = { // Tailwind 색(동적 클래스가 빠지지 않도록 미리 나열)
+      sky:'bg-sky-600 text-sky-700 bg-sky-50 border-sky-200', green:'bg-green-700 text-green-700 bg-green-50 border-green-200',
+      amber:'bg-amber-600 text-amber-700 bg-amber-50 border-amber-200', indigo:'bg-indigo-600 text-indigo-700 bg-indigo-50 border-indigo-200',
+      teal:'bg-teal-600 text-teal-700 bg-teal-50 border-teal-200', purple:'bg-purple-600 text-purple-700 bg-purple-50 border-purple-200',
+      rose:'bg-rose-600 text-rose-700 bg-rose-50 border-rose-200', cyan:'bg-cyan-700 text-cyan-700 bg-cyan-50 border-cyan-200',
+      violet:'bg-violet-600 text-violet-700 bg-violet-50 border-violet-200', emerald:'bg-emerald-600 text-emerald-700 bg-emerald-50 border-emerald-200'
+    };
+    const cls = (c, i) => C[c].split(' ')[i];
+    let state = { subject: 'all', q: '', school: '', favOnly: false };
+    let favs = [];
+    try { favs = JSON.parse(localStorage.getItem('wsHubFavs') || '[]'); } catch (e) { favs = []; }
+    const saveFavs = () => { try { localStorage.setItem('wsHubFavs', JSON.stringify(favs)); } catch (e) {} };
+    const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+    function renderSummary() {
+      const n = GENERATORS.length, types = GENERATORS.reduce((s, g) => s + (g.types || 0), 0);
+      const subj = SUBJECTS.filter(s => GENERATORS.some(g => g.subject === s.id)).length;
+      const last = GENERATORS.map(g => g.updated).sort().pop() || '-';
+      const box = (icon, label, val) => `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center"><i data-lucide="${icon}" class="w-5 h-5 text-slate-600"></i></div><div><div class="text-[11px] text-slate-500 font-semibold">${label}</div><div class="text-lg font-black text-slate-900">${val}</div></div></div>`;
+      document.getElementById('summary').innerHTML = box('layout-grid', '생성기', n + '개') + box('book-marked', '과목', subj + '개') + box('list-checks', '문제 유형', types + '가지') + box('calendar-check', '최근 업데이트', last);
+    }
+    function renderTabs() {
+      const count = id => id === 'all' ? GENERATORS.length : GENERATORS.filter(g => g.subject === id).length;
+      const tab = (id, name, icon) => {
+        const on = state.subject === id;
+        return `<button data-sub="${id}" class="tab px-3.5 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 border ${on ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}"><i data-lucide="${icon}" class="w-4 h-4"></i>${name}<span class="text-[11px] font-semibold ${on ? 'text-slate-300' : 'text-slate-400'}">${count(id)}</span></button>`;
+      };
+      document.getElementById('subject-tabs').innerHTML = tab('all', '전체', 'layers') + SUBJECTS.map(s => tab(s.id, s.name, s.icon)).join('');
+      document.querySelectorAll('.tab').forEach(b => b.onclick = () => { state.subject = b.dataset.sub; render(); });
+    }
+    function match(g) {
+      if (state.subject !== 'all' && g.subject !== state.subject) return false;
+      if (state.school && !(g.school || []).includes(state.school)) return false;
+      if (state.favOnly && !favs.includes(g.url)) return false;
+      if (state.q) { const t = (g.title + ' ' + g.desc + ' ' + (g.grade || '')).toLowerCase(); if (!state.q.toLowerCase().split(/\s+/).every(w => t.includes(w))) return false; }
+      return true;
+    }
+    function card(g) {
+      const fav = favs.includes(g.url);
+      return `<div class="card relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="h-1.5 ${cls(g.color, 0)}"></div>
+        <button class="fav absolute top-4 right-3 p-1 rounded-lg hover:bg-slate-100" data-url="${esc(g.url)}" title="즐겨찾기"><i data-lucide="star" class="w-4 h-4 ${fav ? 'text-yellow-400 fill-yellow-400' : 'text-slate-300'}"></i></button>
+        <a href="${esc(g.url)}" class="p-4 flex-1 flex flex-col gap-3">
+          <div class="flex items-center gap-3 pr-6">
+            <div class="w-11 h-11 rounded-xl ${cls(g.color, 2)} border ${cls(g.color, 3)} flex items-center justify-center shrink-0"><i data-lucide="${g.icon}" class="w-6 h-6 ${cls(g.color, 1)}"></i></div>
+            <div class="min-w-0"><div class="text-[11px] font-bold ${cls(g.color, 1)}">${esc((SUBJECTS.find(s => s.id === g.subject) || {}).name || '')}</div><h3 class="text-lg font-black text-slate-900 leading-tight">${esc(g.title)}</h3></div>
+          </div>
+          <p class="text-[13px] text-slate-600 leading-relaxed flex-1">${esc(g.desc)}</p>
+          <div class="flex flex-wrap gap-1.5 text-[11px]">
+            ${g.grade ? `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">${esc(g.grade)}</span>` : ''}
+            ${g.levels ? `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">${esc(g.levels)}</span>` : ''}
+            ${g.types ? `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">유형 ${g.types}가지</span>` : ''}
+          </div>
+          <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+            <span class="text-slate-400">업데이트 ${esc(g.updated || '-')}</span>
+            <span class="font-bold ${cls(g.color, 1)} flex items-center gap-1">열기 <i data-lucide="external-link" class="w-3.5 h-3.5"></i></span>
+          </div>
+        </a>
+      </div>`;
+    }
+    function renderList() {
+      const groups = (state.subject === 'all' ? SUBJECTS : SUBJECTS.filter(s => s.id === state.subject));
+      let html = '';
+      groups.forEach(s => {
+        const all = GENERATORS.filter(g => g.subject === s.id), shown = all.filter(match);
+        if (state.subject === 'all' && !all.length && (state.q || state.school || state.favOnly)) return;
+        html += `<div><div class="flex items-center gap-2 mb-3"><i data-lucide="${s.icon}" class="w-5 h-5 ${cls(s.color, 1)}"></i><h2 class="text-lg font-black text-slate-900">${esc(s.name)}</h2><span class="text-xs text-slate-400 font-semibold">${shown.length}개</span></div>`;
+        if (!all.length) {
+          html += `<div class="bg-white/60 border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-400"><i data-lucide="hammer" class="w-5 h-5 mx-auto mb-1"></i>준비 중이에요. ${esc(s.name)} 학습지 생성기가 곧 추가될 예정입니다.</div></div>`;
+          return;
+        }
+        if (!shown.length) { html += `<div class="text-sm text-slate-400 bg-white rounded-xl border border-slate-200 p-4">조건에 맞는 생성기가 없어요.</div></div>`; return; }
+        html += `<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${shown.map(card).join('')}</div></div>`;
+      });
+      document.getElementById('list').innerHTML = html || '<div class="text-sm text-slate-400">조건에 맞는 생성기가 없어요.</div>';
+      document.querySelectorAll('.fav').forEach(b => b.onclick = e => {
+        e.preventDefault(); e.stopPropagation();
+        const u = b.dataset.url; favs = favs.includes(u) ? favs.filter(x => x !== u) : favs.concat([u]); saveFavs(); render();
+      });
+    }
+    function render() { renderSummary(); renderTabs(); renderList(); try { lucide.createIcons(); } catch (e) {} }
+    document.getElementById('q').addEventListener('input', e => { state.q = e.target.value.trim(); render(); });
+    document.getElementById('school').addEventListener('change', e => { state.school = e.target.value; render(); });
+    document.getElementById('favonly').addEventListener('change', e => { state.favOnly = e.target.checked; render(); });
+    render();
+  </script>
+</body>
+</html>

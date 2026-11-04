@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>[수학] 단위·눈금읽기 맞춤형 학습지 생성기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+    body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; }
+    @media print {
+      html, body { background-color: #fff !important; height: auto !important; min-height: auto !important; overflow: visible !important; }
+      .no-print { display: none !important; }
+      main { display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
+      #print-pages-container { display: block !important; width: 100% !important; }
+      .print-area {
+        width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 6mm !important;
+        box-sizing: border-box !important; box-shadow: none !important; border: none !important;
+        page-break-after: always !important; break-after: page !important; page-break-inside: avoid !important;
+        height: 285mm !important; overflow: hidden !important;
+      }
+      .print-area:last-child { page-break-after: auto !important; break-after: auto !important; }
+      @page { size: A4; margin: 6mm; }
+    }
+    body.answer-view #main-header, body.answer-view #option-panel,
+    body.answer-view #print-control-toolbar, body.answer-view footer { display: none !important; }
+    body.answer-view main { display: block; padding: 10px; max-width: 900px; margin: 0 auto; }
+    body.answer-view .print-area { box-shadow: none; border-color: #e2e8f0; }
+    .print-area.big-mode .qtext-el { font-size: 14.5px !important; line-height: 1.55 !important; }
+    .print-area.big-mode .answer-box { font-size: 14px !important; }
+    /* 그림(SVG) 영역 */
+    .viz { display: block; margin: 2px auto; width: 100%; height: auto; max-height: var(--vmax, 190px); }
+    .ansonly { visibility: hidden; }
+    .show-ans .ansonly { visibility: visible; }
+    .choice-svg { display: inline-block; vertical-align: middle; width: 30px; height: 30px; }
+    .vtable { border-collapse: collapse; margin: 3px auto; }
+    .vtable td, .vtable th { border: 1px solid #94a3b8; text-align: center; padding: 0; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+  <header id="main-header" class="bg-teal-600 text-white shadow-md py-4 px-6 no-print">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <i data-lucide="ruler" class="w-8 h-8 text-yellow-300"></i>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">[수학] 단위·눈금읽기 맞춤형 학습지 생성기</h1>
+          <p class="text-xs text-teal-100">수학 교육과정 기반 맞춤형 문제 자동 생성 플랫폼 · <b class="text-yellow-200">made by 특수교사 슬옹쌤</b></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-sm text-teal-50 bg-black/20 px-3 py-1.5 rounded-lg">
+        <i data-lucide="info" class="w-4 h-4"></i>
+        <span>정확한 인쇄를 위해 <b>[배경 그래픽 인쇄]</b> 옵션을 켜주세요.</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-6">
+    <section id="option-panel" class="w-full md:w-96 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 shrink-0 self-start no-print"></section>
+
+    <section class="flex-1 flex flex-col gap-6">
+      <div id="print-control-toolbar" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center no-print">
+        <span class="text-sm font-medium text-slate-500">실시간 학습지 미리보기</span>
+        <select id="qr-mode" title="QR에 무엇을 담을지" onchange="QR_MODE=this.value;makeQRCodes();" class="ml-auto mr-2 rounded-lg border border-slate-200 px-2 py-2 text-xs bg-white font-semibold text-slate-600"><option value="link">QR: 정답지 페이지 열기</option><option value="text">QR: 정답 글자 (로그인 불필요)</option></select>
+          <button onclick="printSheet()" class="bg-teal-600 hover:opacity-90 text-white font-bold px-5 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md">
+          <i data-lucide="printer" class="w-5 h-5"></i> 인쇄 및 PDF 저장
+        </button>
+      </div>
+      <div id="print-pages-container" class="space-y-6"></div>
+    </section>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs mt-12 no-print border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 space-y-2">
+      <p>본 학습지는 도형과 측정 영역의 길이·무게·들이 단위와 눈금 읽기 내용 요소를 참고하여 구성했습니다.</p>
+      <p>© 2026 단위·눈금읽기 맞춤형 학습지 · <b class="text-slate-200">made by 특수교사 슬옹쌤</b></p>
+    </div>
+  </footer>
+
+  <script>
+    // ── QR 정답지 설정: 스캔하면 이 생성기의 정답지 화면이 바로 열려요 ──
+    const ANSWER_URL = 'https://teacher-sulong.github.io/worksheets/unit.html';
+    let QR_MODE = 'link';
+    // 정답지 화면: 휴대폰 화면 폭에 학습지 한 장이 통째로 보이도록 맞춤
+    function fitAnswerView(){ if(!document.body.classList.contains('answer-view'))return; var c=document.getElementById('print-pages-container'); if(!c)return; c.style.zoom=Math.min(1,(window.innerWidth-12)/850); }
+    window.addEventListener('resize', fitAnswerView);
+    window.addEventListener('hashchange', function () { if (/^#k[-=]/.test(location.hash)) location.reload(); });
+// ═════════════════════ 공통 코어 (시계·달력 생성기와 동일한 구성) ═════════════════════
+// ───────── 시드 난수 (QR 재현용) ─────────
+function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+let rng = Math.random;
+function randInt(a,b){return Math.floor(rng()*(b-a+1))+a;}
+function pick(arr){return arr[Math.floor(rng()*arr.length)];}
+function shuffle(a){const r=a.slice();for(let i=r.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));const t=r[i];r[i]=r[j];r[j]=t;}return r;}
+function sample(a,n){return shuffle(a).slice(0,n);}
+function chance(p){return rng()<p;}
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return h>>>0;}
+function comma(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function plain(h){return String(h).replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();}
+function uniq(a){return [...new Set(a)];}
+function sum(a){return a.reduce((x,y)=>x+y,0);}
+
+// ───────── 한국어 조사 ─────────
+const NAMES=['이준','하준','도윤','서준','은우','시우','유준','주원','서윤','서아','이서','지유','하린','아린','시아','하은','소율','채원'];
+function hasBatchim(w){if(!w)return false;const c=w.charCodeAt(w.length-1);if(c<0xac00||c>0xd7a3)return false;return (c-0xac00)%28>0;}
+function dispName(n){return n+(hasBatchim(n)?'이':'');}
+function josaW(w,t){const b=hasBatchim(w);if(t==='eun')return b?'은':'는';if(t==='i')return b?'이':'가';if(t==='eul')return b?'을':'를';if(t==='wa')return b?'과':'와';if(t==='ro')return b?'으로':'로';return '';}
+function josaNum(s,t){const d=String(s).replace(/[^0-9]/g,'').slice(-1);const b='013678'.includes(d||'2');if(t==='eun')return b?'은':'는';if(t==='i')return b?'이':'가';if(t==='eul')return b?'을':'를';if(t==='wa')return b?'과':'와';return '';}
+function pickName(){return pick(NAMES);}
+function nm(n,t){const d=dispName(n);return d+josaW(d,t);}   // nm('하준','i') → 하준이가
+function jw(w,t){return w+josaW(w,t);}                       // jw('사과','eul') → 사과를
+
+// ───────── SVG 헬퍼 ─────────
+let _u=0;function uid(){return 'u'+(++_u);}
+function svgWrap(w,h,inner,cls){return `<svg class="viz ${cls||''}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" font-family="'Noto Sans KR',sans-serif">${inner}</svg>`;}
+function Tx(x,y,s,o){o=o||{};const size=o.size||12,fill=o.fill||'#1e293b',anchor=o.anchor||'middle',weight=o.weight||600;return `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}"${o.rot?` transform="rotate(${o.rot} ${x} ${y})"`:''}${o.op?` opacity="${o.op}"`:''}>${s}</text>`;}
+function ansG(inner){return `<g class="ansonly">${inner}</g>`;}
+function rnd1(n){return Math.round(n*10)/10;}
+function r2(n){return Math.round(n*100)/100;}
+
+// ───────── 상태 ─────────
+const ALL_S=['subjective','objective','narrative'];
+const KOREAN_STYLES={subjective:'주관식',objective:'객관식',narrative:'문장제'};
+let ALL_T=[],TYPE={};
+const O=()=>config.opt;
+let config=null,generatedPages=[],pageSeeds=[],showAnswers=false,answerViewMode=false;
+
+function initConfig(){
+  GEN.groups.forEach(g=>g.types.forEach(t=>{ALL_T.push(t.key);TYPE[t.key]=t;}));
+  config={pages:2,questionsPerPage:9,level:GEN.defLevel,progression:'single',bigMode:false,boldKey:true,opt:{},sel:{},
+    styles:ALL_S.slice(),types:ALL_T.slice(),typeWeights:{},dateStr:''};
+  GEN.checks.forEach(c=>config.opt[c.id]=!!c.def);
+  GEN.selects.forEach(s=>config.sel[s.id]=s.def);
+}
+
+// ───────── 문제 생성 ─────────
+function perQLevel(gi,total){
+  const L=config.level,mode=config.progression;
+  if(mode==='single'||L<=1||total<=1)return L;
+  const r=gi/(total-1);let v;
+  if(mode==='asc')v=1+Math.round(r*(L-1));
+  else if(mode==='desc')v=1+Math.round((1-r)*(L-1));
+  else v=randInt(1,L);
+  return Math.max(1,Math.min(L,v));
+}
+function makeQuestion(type,style,lv){
+  const o=GEN.build(type,style,lv);
+  if(!o)return null;
+  o.type=type;o.style=style;o.lv=lv;
+  if(!o.viz)o.viz='';
+  if(style==='objective'){
+    if(!o.choices){
+      const a=String(o.ans);
+      const ds=uniq((o.distract||[]).map(String)).filter(x=>x!==a);
+      if(ds.length<3)return null;
+      const ch=shuffle([a].concat(shuffle(ds).slice(0,3)));
+      o.choices=ch;o.correctIdx=ch.indexOf(a);
+    }
+    o.ansKey=(o.correctIdx+1)+'번';
+  } else {
+    o.ansKey=plain(o.ans);
+  }
+  return o;
+}
+function buildPageQuestions(seed,pIdx){
+  rng=mulberry32(seed>>>0);
+  const qpp=config.questionsPerPage,total=config.pages*qpp,out=[],seen=new Set();
+  const selT=ALL_T.filter(t=>config.types.includes(t));const types=selT.length?selT:[ALL_T[0]];
+  const selS=ALL_S.filter(s=>config.styles.includes(s));const styles=selS.length?selS:['subjective'];
+  for(let q=0;q<qpp;q++){
+    const gi=pIdx*qpp+q;const lv=perQLevel(gi,total);
+    const dist=t=>{const T=TYPE[t];return lv<T.minLv?T.minLv-lv:(lv>(T.maxLv||99)?lv-(T.maxLv||99):0);};
+    let cand=types.filter(t=>dist(t)===0);
+    if(!cand.length){const md=Math.min(...types.map(dist));cand=types.filter(t=>dist(t)===md);}
+    const pool=[];
+    cand.forEach(t=>{let w=Math.max(1,Math.min(5,config.typeWeights[t]||1));if(TYPE[t].minLv>=lv-1&&TYPE[t].minLv>1)w*=2;for(let i=0;i<w;i++)pool.push(t);});
+    let o=null;
+    for(let n=0;n<40;n++){
+      const type=pool[Math.floor(rng()*pool.length)];const T=TYPE[type];
+      const eLv=Math.max(T.minLv,Math.min(T.maxLv||99,lv));
+      const allowed=T.styles||ALL_S;let av=styles.filter(s=>allowed.includes(s));if(!av.length)av=[allowed[0]];
+      const style=pick(av);
+      let c=null;
+      try{c=makeQuestion(type,style,eLv);}catch(e){console.error('build error',type,e&&e.stack||e);c=null;}
+      if(!c)continue;
+      const sig=hash(plain(c.q)+'|'+c.ansKey+'|'+String(c.viz).replace(/u\d+/g,''));
+      if(!seen.has(sig)||n>=39){o=c;seen.add(sig);break;}
+    }
+    if(!o){
+      try{o=makeQuestion(types[0],'subjective',Math.max(TYPE[types[0]].minLv,Math.min(TYPE[types[0]].maxLv||99,lv)));}catch(e){console.error('fallback error',e);}
+    }
+    if(!o)o={q:'(문제 생성 오류)',viz:'',ans:'-',ansKey:'-',style:'subjective',type:types[0],lv:lv};
+    o.seq=q;out.push(o);
+  }
+  out.forEach((o,i)=>{o.num=i+1;o.globalNum=pIdx*qpp+i+1;});
+  return out;
+}
+
+// ───────── QR 자동 채점 (상태 인코딩) ─────────
+function encodeState(seed,pIdx){
+  let tmask=0;ALL_T.forEach((t,i)=>{if(config.types.includes(t))tmask|=(1<<i);});
+  let smask=0;ALL_S.forEach((s,i)=>{if(config.styles.includes(s))smask|=(1<<i);});
+  let flags=(config.bigMode?1:0)|(config.boldKey?2:0);
+  GEN.checks.forEach((c,i)=>{if(config.opt[c.id])flags|=(1<<(2+i));});
+  const parts=[flags,tmask,smask,config.questionsPerPage,config.pages,pIdx,(seed>>>0),config.level,({single:0,asc:1,desc:2,mix:3}[config.progression]||0)];
+  GEN.selects.forEach(s=>{parts.push(Math.max(0,s.options.findIndex(o=>o[0]===config.sel[s.id])));});
+  let wStr='',any=false;ALL_T.forEach(t=>{const w=Math.max(1,Math.min(5,config.typeWeights[t]||1));if(w!==1)any=true;wStr+=String(w);});
+  const out=parts.map(n=>n.toString(36));if(any)out.push(wStr);return out.join('-');
+}
+function decodeState(str){
+  const tok=str.split(/[.-]/);const nSel=GEN.selects.length;const p=tok.map((x,i)=>i<9+nSel?parseInt(x,36):x);
+  const flags=p[0];const wStr=(tok.length>9+nSel)?tok[9+nSel]:null;
+  const w={};ALL_T.forEach((t,i)=>{w[t]=wStr?(parseInt(wStr[i],10)||1):1;});
+  const opt={};GEN.checks.forEach((c,i)=>{opt[c.id]=!!(flags&(1<<(2+i)));});
+  const sel={};GEN.selects.forEach((s,i)=>{const o=s.options[p[9+i]];sel[s.id]=o?o[0]:s.def;});
+  return {big:(flags&1)?1:0,bk:(flags&2)?1:0,opt,sel,ty:ALL_T.filter((t,i)=>p[1]&(1<<i)),st:ALL_S.filter((s,i)=>p[2]&(1<<i)),qpp:p[3],pg:p[4],p:p[5],sd:(p[6]>>>0),lv:p[7]||1,prog:({0:'single',1:'asc',2:'desc',3:'mix'}[p[8]]||'single'),w};
+}
+function applyState(s){
+  config.bigMode=!!s.big;config.boldKey=!!s.bk;config.opt=s.opt;config.sel=s.sel;config.level=s.lv;config.progression=s.prog||'single';
+  config.styles=(s.st&&s.st.length)?s.st:['subjective'];config.types=(s.ty&&s.ty.length)?s.ty:[ALL_T[0]];
+  config.questionsPerPage=s.qpp;config.pages=s.pg;config.typeWeights=s.w||{};
+}
+function buildAnswerKeyText(pIdx){const qs=generatedPages[pIdx]||[];return qs.map(q=>`${q.globalNum}) ${q.ansKey}`).join('  ');}
+function makeQRCodes(){
+  if(typeof qrcode==='undefined')return;
+  try{if(qrcode.stringToBytesFuncs&&qrcode.stringToBytesFuncs['UTF-8'])qrcode.stringToBytes=qrcode.stringToBytesFuncs['UTF-8'];}catch(e){}
+  const hosted=(QR_MODE!=='text')&&(!!ANSWER_URL||/^https?:$/.test(location.protocol));const base=hosted?(ANSWER_URL||location.href.split('#')[0]):'';
+  generatedPages.forEach((_,pIdx)=>{
+    const el=document.getElementById('qr-'+pIdx);if(!el)return;
+    const data=hosted?(base+'#k-'+encodeState(pageSeeds[pIdx],pIdx)):buildAnswerKeyText(pIdx);
+    const draw=(txt,ec)=>{const qr=qrcode(0,ec);qr.addData(txt,'Byte');qr.make();el.innerHTML=qr.createSvgTag({cellSize:4,margin:3,scalable:true});const svg=el.querySelector('svg');if(svg){svg.setAttribute('width','100%');svg.setAttribute('height','100%');svg.style.display='block';}};
+    try{draw(data,'L');}catch(e){try{draw(data,'M');}catch(e2){el.innerHTML='<span class="text-[7px] text-slate-400">QR</span>';}}
+  });
+}
+function tryAnswerView(){
+  const h=location.hash||'';const i=h.search(/k[-=]/);if(i<0)return false;
+  let s;try{s=decodeState(h.slice(i+2));}catch(e){return false;}if(!s||s.sd===undefined||isNaN(s.sd))return false;
+  applyState(s);answerViewMode=true;showAnswers=true;
+  generatedPages=[buildPageQuestions(s.sd>>>0,s.p)];pageSeeds=[s.sd>>>0];
+  document.body.classList.add('answer-view');setTimeout(fitAnswerView,30);renderHTML();
+  document.querySelectorAll('.answer-box').forEach(el=>{el.classList.remove('invisible','opacity-0');el.classList.add('visible','opacity-100');});
+  const cont=document.getElementById('print-pages-container');
+  if(cont)cont.insertAdjacentHTML('afterbegin','<div class="max-w-[840px] mx-auto mb-3 bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold flex items-center justify-between"><span>✔ 정답지 (채점용) — made by 특수교사 슬옹쌤</span></div>');
+  tryIcons();return true;
+}
+
+// ───────── 옵션 패널 (동적 구성) ─────────
+function buildPanel(){
+  const C='teal-600';
+  const lvOpts=GEN.levels.map((l,i)=>`<option value="${i+1}"${(i+1)===GEN.defLevel?' selected':''}>${l.s} (${l.d})</option>`).join('');
+  const checks=GEN.checks.map(c=>`<label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-${c.id}" class="w-4 h-4 text-${C} rounded"${c.def?' checked':''} onchange="regenerateSheet()"><span>${c.label}</span></label>`).join('');
+  const sels=GEN.selects.map(s=>`<div class="space-y-3"><label class="block text-sm font-semibold text-slate-700">${s.title}</label><div class="grid grid-cols-${Math.min(3,s.options.length)} gap-2">${s.options.map(o=>`<label class="cursor-pointer border border-slate-200 rounded-lg p-2 flex flex-col items-center gap-1 bg-white hover:bg-slate-50 [&:has(input:checked)]:border-${C} [&:has(input:checked)]:bg-teal-50"><input type="radio" name="sel-${s.id}" value="${o[0]}" class="sr-only"${o[0]===s.def?' checked':''} onchange="regenerateSheet()"><span class="text-xs font-semibold text-center">${o[1]}</span></label>`).join('')}</div>${s.note?`<p class="text-xs text-slate-400">${s.note}</p>`:''}</div>`).join('');
+  const groups=GEN.groups.map(g=>`<div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">${g.label}</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-toggle w-3.5 h-3.5 text-${C} rounded" data-grp="grp-${g.id}" checked onchange="toggleGroup(this,'grp-${g.id}')">전체</label></div>
+        <div id="grp-${g.id}" class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">${g.types.map(t=>`<label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-${C} rounded" value="${t.key}" checked onchange="regenerateSheet()"><span>${t.label}</span></label>`).join('')}</div>`).join('');
+  document.getElementById('option-panel').innerHTML=`
+      <div class="flex items-center gap-2 pb-4 border-b border-slate-100">
+        <i data-lucide="sliders" class="w-5 h-5 text-${C}"></i>
+        <h2 class="text-lg font-bold text-slate-950">학습지 형성 옵션</h2>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">인쇄 페이지 수 (최대 10장)</label>
+        <select id="sheet-pages" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none font-medium" onchange="setPagesDropdown(this.value)">
+          ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${n===2?' selected':''}>${n}장 ${n===10?'대량 생성':'생성'}</option>`).join('')}
+        </select>
+        <p class="text-xs text-slate-400">각 페이지당 최대 9개의 문제가 포함됩니다.</p>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700 flex justify-between"><span>페이지당 문제 수</span><span id="num-of-questions-val" class="text-${C} font-bold">9개</span></label>
+        <input type="range" id="questions-count" min="1" max="9" value="9" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-${C}" oninput="updateQuestionsCount(this.value)">
+        <div class="flex justify-between text-[10px] text-slate-400"><span>1개</span><span>3개 (1줄)</span><span>6개 (2줄)</span><span>9개 (3줄)</span></div>
+      </div>
+      <div class="space-y-3">
+        <label for="difficulty" class="block text-sm font-semibold text-slate-700">${GEN.levelTitle}</label>
+        <select id="difficulty" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none" onchange="regenerateSheet()">${lvOpts}</select>
+      </div>
+      <div class="space-y-3">
+        <label for="progression" class="block text-sm font-semibold text-slate-700">난이도 배치 방식</label>
+        <select id="progression" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none" onchange="regenerateSheet()">
+          <option value="single" selected>단일 (선택한 단계로 고정)</option>
+          <option value="asc">쉬움 → 어려움 (오름차순)</option>
+          <option value="desc">어려움 → 쉬움 (내림차순)</option>
+          <option value="mix">혼합 (무작위 섞기)</option>
+        </select>
+        <p class="text-xs text-slate-400">단일이 아니면 위에서 고른 단계를 <b>최고 난이도</b>로 보고 1단계부터 분배합니다.</p>
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">세부 옵션 설정 <span class="text-[11px] font-normal text-slate-400">${GEN.optNote}</span></label>
+        <div class="space-y-2 bg-slate-50 border border-slate-100 rounded-lg p-3">
+          ${checks}
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-big" class="w-4 h-4 text-${C} rounded" onchange="regenerateSheet()"><span><b>큰 글씨·큰 그림</b> <span class="text-[10px] text-${C} font-semibold">(적정 6문제 추천)</span></span></label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-boldkey" class="w-4 h-4 text-${C} rounded" checked onchange="regenerateSheet()"><span>문제의 <b>중요 부분 볼드 처리</b> (끄면 균일한 글씨)</span></label>
+        </div>
+      </div>
+      ${sels}
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">문제 문항 방식 (중복 선택)</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-subjective" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>주관식 (일반 서술형)</span></label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-objective" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>객관식 (4지 선다형)</span></label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-narrative" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>문장제 (실생활 맥락 시나리오)</span></label>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">수학 문제 세부 유형</label>
+        <p class="text-[11px] text-slate-400 leading-relaxed">각 항목 오른쪽 숫자(1~5)로 <b>출제 비중</b>을, 영역 제목 옆 <b>전체</b> 체크로 해당 영역을 한 번에 켜고 끌 수 있어요.</p>
+        ${groups}
+      </div>
+      <div class="pt-4 border-t border-slate-100 flex flex-col gap-2">
+        <button onclick="regenerateSheet()" class="w-full bg-slate-900 text-white font-bold py-3 px-4 rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4"></i> 새로운 문제 생성하기</button>
+        <button onclick="toggleAnswers()" id="toggle-ans-btn" class="w-full bg-teal-50 border border-teal-200 text-${C} font-semibold py-2.5 px-4 rounded-xl hover:bg-teal-100 transition flex items-center justify-center gap-2"><i data-lucide="eye" id="eye-icon" class="w-4 h-4"></i> <span id="ans-text">답안 정답 보이기</span></button>
+      </div>`;
+}
+function readOptions(){
+  const g=id=>document.getElementById(id);
+  config.level=parseInt(g('difficulty').value)||GEN.defLevel;
+  config.progression=g('progression').value||'single';
+  GEN.checks.forEach(c=>{config.opt[c.id]=g('opt-'+c.id).checked;});
+  config.bigMode=g('opt-big').checked;config.boldKey=g('opt-boldkey').checked;
+  GEN.selects.forEach(s=>{const r=document.querySelector(`input[name="sel-${s.id}"]:checked`);config.sel[s.id]=r?r.value:s.def;});
+  config.typeWeights={};document.querySelectorAll('.type-weight').forEach(i=>config.typeWeights[i.dataset.type]=Math.max(1,Math.min(5,parseInt(i.value)||1)));
+  const st=[];if(g('style-subjective').checked)st.push('subjective');if(g('style-objective').checked)st.push('objective');if(g('style-narrative').checked)st.push('narrative');
+  config.styles=st.length?st:['subjective'];if(!st.length)g('style-subjective').checked=true;
+  const ty=[];document.querySelectorAll('.type-checkbox:checked').forEach(e=>ty.push(e.value));
+  config.types=ty.length?ty:[ALL_T[0]];if(!ty.length)document.querySelector('.type-checkbox').checked=true;
+}
+function toggleGroup(cb,gid){const g=document.getElementById(gid);if(g)g.querySelectorAll('.type-checkbox').forEach(x=>{x.checked=cb.checked;});regenerateSheet();}
+function syncGroupToggles(){document.querySelectorAll('.group-toggle').forEach(gt=>{const g=document.getElementById(gt.dataset.grp);if(!g)return;const items=[...g.querySelectorAll('.type-checkbox')];gt.checked=items.length>0&&items.every(x=>x.checked);});}
+function regenerateSheet(){
+  syncGroupToggles();readOptions();generatedPages=[];pageSeeds=[];
+  const base=((Date.now()^Math.floor(Math.random()*0x1000000))&0xFFFFFF)>>>0;
+  for(let p=0;p<config.pages;p++){const sd=(base+p*0x9E3779B1)>>>0;pageSeeds.push(sd);generatedPages.push(buildPageQuestions(sd,p));}
+  renderHTML();tryIcons();
+}
+
+// ───────── 학습지 HTML ─────────
+function renderChoices(q){
+  const maxLen=Math.max(...q.choices.map(x=>plain(x).length));
+  const long=maxLen>9;
+  const svgC=q.choices.some(x=>/<svg/.test(x));
+  const cols=svgC?'grid-cols-4':(maxLen>13?'grid-cols-1':'grid-cols-2');
+  return `<div class="mt-1.5"><div class="grid ${cols} gap-x-1 gap-y-0.5">${q.choices.map((ch,i)=>`<div class="${long?'text-[10px]':'text-[11px]'} text-slate-600 flex items-center gap-1"><span class="inline-block w-3.5 h-3.5 shrink-0 rounded-full border border-slate-300 text-[9px] text-center leading-3.5 font-bold">${i+1}</span><span class="${svgC?'':(maxLen>13?'flex-1 break-keep leading-tight':'flex-1 break-keep leading-tight')}">${ch}</span></div>`).join('')}</div><div class="mt-1 text-[9px] border-t border-slate-100 pt-0.5 text-slate-400">정답 기입: ( <span class="answer-box ${showAnswers?'visible text-red-500 font-bold text-xs':'invisible opacity-0'}">${q.correctIdx+1}</span> )</div></div>`;
+}
+// 카드 내용이 넘칠 때 자동으로 조금씩 줄여 맞춤(잘림 방지)
+function fitCards(){document.querySelectorAll('.print-area > div.grid > div').forEach(function(card){var inner=card.children[0];if(!inner)return;inner.style.zoom='';var z=1,g=0;while(card.scrollHeight-card.clientHeight>1&&z>0.5&&g++<14){z=Math.max(0.5,z-0.05);inner.style.zoom=z;}});}
+function renderHTML(){
+  const c=document.getElementById('print-pages-container');if(!c)return;c.innerHTML='';
+  const bg='bg-teal-600 text-white border-teal-600 font-bold',off='bg-slate-50 text-slate-400 border-slate-200 font-normal';
+  generatedPages.forEach((questions,pIdx)=>{
+    const page=document.createElement('div');
+    page.className="bg-white p-5 md:p-6 shadow-lg border border-slate-200 rounded-2xl print-area page-break max-w-[840px] mx-auto h-[1180px] overflow-hidden flex flex-col"+(config.bigMode?" big-mode":"")+(showAnswers?" show-ans":"");
+    const sBadges=ALL_S.map(s=>`<span class="${config.styles.includes(s)?bg:off} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${KOREAN_STYLES[s]}</span>`).join('');
+    const tBadges=ALL_T.map(t=>`<span class="${config.types.includes(t)?bg:off} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${TYPE[t].short||TYPE[t].label}</span>`);
+    const tRows=[];for(let i=0;i<tBadges.length;i+=6)tRows.push(`<div class="flex gap-1 flex-wrap">${tBadges.slice(i,i+6).join('')}</div>`);
+    const progLbl={single:'단일 (고정)',asc:'쉬움→어려움',desc:'어려움→쉬움',mix:'혼합 (무작위)'}[config.progression]||'단일 (고정)';
+    const L=GEN.levels[config.level-1]||GEN.levels[0];
+    const lvMain=(config.progression==='single')?`${L.s} · ${L.d}`:`${L.s}까지 (${progLbl})`;
+    const pageNum=(questions[0]&&questions[0].globalNum)?Math.floor((questions[0].globalNum-1)/config.questionsPerPage)+1:(pIdx+1);
+    const extra=(GEN.info?GEN.info():[]).map(x=>`<div>${x}</div>`).join('');
+    const qrBlock=`<div class="flex flex-col items-center gap-0.5 shrink-0"><div id="qr-${pIdx}" class="w-[100px] h-[100px] bg-white border border-slate-200 rounded p-1 flex items-center justify-center overflow-hidden"></div><span class="text-[8px] text-slate-500 font-bold leading-none">정답 QR (스캔)</span></div>`;
+    const header=`<div class="border-b-2 border-slate-800 pb-2 mb-2">
+      <div class="flex justify-between items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="bg-teal-600 text-white text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full">PAGE ${pageNum}</span>
+            <h1 class="text-xl font-extrabold tracking-tight text-slate-900">${GEN.title} 맞춤형 학습지</h1>
+            <span class="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded-full">made by 특수교사 슬옹쌤</span>
+          </div>
+          <div class="flex flex-col gap-1.5 mt-2.5 text-[10px] items-start">
+            <div class="flex flex-wrap items-center gap-1"><span class="font-extrabold text-slate-600 text-[9px] uppercase whitespace-nowrap">문항 방식:</span>${sBadges}</div>
+            <div class="flex items-start gap-1"><span class="font-extrabold text-slate-600 text-[9px] uppercase pt-0.5 whitespace-nowrap">세부 유형:</span><div class="flex flex-col gap-1">${tRows.join('')}</div></div>
+          </div>
+        </div>
+        <div class="flex items-start gap-2 shrink-0">
+          <div class="text-right text-[10px] text-slate-600 space-y-0.5 bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-medium max-w-[190px]">
+            <div>출력 일자: ${config.dateStr}</div><div>학습 단계: ${lvMain}</div>${extra}<div>총 문항수: ${config.questionsPerPage}문항</div>
+          </div>
+          ${qrBlock}
+        </div>
+      </div>
+    </div>`;
+    const cols=config.bigMode?2:3;const gridRows=Math.max(1,Math.ceil(config.questionsPerPage/cols));
+    const rowH=(930-(gridRows-1)*10)/gridRows;const vmax=Math.max(70,Math.floor(rowH-(config.bigMode?112:122)));
+    let grid=`<div class="grid gap-2.5 flex-1 min-h-0" style="--vmax:${vmax}px;grid-template-columns:repeat(${cols},minmax(0,1fr));grid-template-rows:repeat(${gridRows},minmax(0,1fr));">`;
+    questions.forEach(q=>{
+      let ans;
+      if(q.style==='objective'&&q.choices){ans=renderChoices(q);}
+      else{ans=`<div class="mt-1.5 border-b border-dashed border-slate-300 pb-0.5 flex items-baseline"><span class="text-[9px] text-slate-400 font-semibold mr-1 shrink-0 whitespace-nowrap">정답 :</span><span class="answer-box text-[11px] font-extrabold text-red-500 pl-0.5 ${showAnswers?'visible':'invisible opacity-0'}">${q.ans}</span></div>`;}
+      let qt=q.q;if(!config.boldKey)qt=qt.replace(/<\/?b>/g,'');
+      grid+=`<div class="flex flex-col justify-between border border-slate-200 p-2 rounded-xl bg-white relative overflow-hidden min-h-0 min-w-0">
+        <div class="min-h-0"><div class="flex justify-between items-center w-full mb-0.5"><span class="font-black text-teal-600 text-xs md:text-sm">${q.globalNum}.</span><span class="text-[7.5px] bg-slate-100 text-slate-500 border border-slate-200 px-1 rounded font-bold">${(GEN.levels[q.lv-1]||{s:''}).s}</span></div>
+        <p class="qtext-el text-[11.5px] md:text-xs font-medium text-slate-900 leading-normal">${qt}</p>${q.viz}</div>
+        <div>${ans}</div></div>`;
+    });
+    grid+=`</div>`;
+    const wm=`<div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[8px] text-slate-300"><span>ⓒ made by 특수교사 슬옹쌤 · ${GEN.title} 학습지 자동 생성</span><span>PAGE ${pageNum} / ${config.pages}</span></div>`;
+    page.innerHTML=header+grid+wm;c.appendChild(page);
+  });
+  try{fitCards();}catch(e){}
+  makeQRCodes();
+}
+
+// ───────── 컨트롤 ─────────
+function tryIcons(){try{if(typeof lucide!=='undefined'&&lucide.createIcons)lucide.createIcons();}catch(e){}}
+function initDate(){const t=new Date();config.dateStr=`${t.getFullYear()}년 ${String(t.getMonth()+1).padStart(2,'0')}월 ${String(t.getDate()).padStart(2,'0')}일`;}
+function setPagesDropdown(v){config.pages=parseInt(v);regenerateSheet();}
+function updateQuestionsCount(v){document.getElementById('num-of-questions-val').innerText=v+'개';config.questionsPerPage=parseInt(v);regenerateSheet();}
+function toggleAnswers(){
+  showAnswers=!showAnswers;const at=document.getElementById('ans-text'),ei=document.getElementById('eye-icon');
+  if(showAnswers){at.innerText='답안 정답 숨기기';ei.setAttribute('data-lucide','eye-off');}else{at.innerText='답안 정답 보이기';ei.setAttribute('data-lucide','eye');}
+  renderHTML();tryIcons();
+}
+function setupTypeWeights(){
+  document.querySelectorAll('.type-checkbox').forEach(cb=>{const label=cb.closest('label');if(!label||label.querySelector('.type-weight'))return;
+    const inp=document.createElement('input');inp.type='number';inp.min='1';inp.max='5';inp.value='1';
+    inp.className='type-weight ml-auto w-9 text-[10px] text-center border border-slate-200 rounded px-0.5 py-0.5';inp.dataset.type=cb.value;inp.title='출제 비중(1~5)';
+    inp.addEventListener('click',e=>e.stopPropagation());inp.addEventListener('input',()=>regenerateSheet());label.appendChild(inp);});
+}
+function printSheet(){try{if(window.self!==window.top){window.parent.focus();window.parent.print();return;}}catch(e){}try{window.focus();window.print();}catch(e){}}
+
+// ═════════════════════ 단위 · 눈금 읽기 ═════════════════════
+const UNIT_KO={mm:'밀리미터',cm:'센티미터',m:'미터',g:'그램',kg:'킬로그램',t:'톤',mL:'밀리리터',L:'리터'};
+const UNIT_KIND={mm:'길이',cm:'길이',m:'길이',g:'무게',kg:'무게',t:'무게',mL:'들이',L:'들이'};
+function U(s){if(s==='L')return O().lowerL?'l':'L';if(s==='mL')return O().lowerL?'ml':'mL';return s;}
+function unitsAt(lv){const u=['cm','m','kg','g','L','mL'];if(lv>=3)u.push('mm');if(lv>=4)u.push('t');return u;}
+const KIND_UNITS={길이:['mm','cm','m'],무게:['g','kg','t'],들이:['mL','L']};
+
+// 생활 속 양 (모두 널리 알려진 대략적인 값)
+const THINGS=[
+  ['연필의 길이',15,'cm',2],['지우개의 길이',4,'cm',2],['공책의 긴 쪽 길이',25,'cm',2],['책상의 높이',70,'cm',2],['손톱의 너비',1,'cm',2],
+  ['교실 칠판의 긴 쪽 길이',4,'m',2],['교실의 긴 쪽 길이',9,'m',2],['운동장 트랙 한 바퀴',400,'m',2],['어른 키',170,'cm',2],['쌀알 한 개의 길이',6,'mm',3],['개미의 몸길이',5,'mm',3],['교실 문의 높이',2,'m',2],
+  ['사과 한 개의 무게',200,'g',2],['달걀 한 개의 무게',60,'g',2],['학생의 몸무게',40,'kg',2],['책가방의 무게',3,'kg',2],['어른 한 명의 몸무게',60,'kg',2],['수박 한 통의 무게',5,'kg',2],['연필 한 자루의 무게',10,'g',2],['승용차의 무게',1,'t',4],['코끼리의 무게',5,'t',4],
+  ['우유 한 팩의 들이',1,'L',2],['종이컵의 들이',200,'mL',2],['작은 물병의 들이',500,'mL',2],['욕조의 들이',200,'L',2],['숟가락 한 큰술의 들이',15,'mL',3],['양동이의 들이',10,'L',2],['생수통의 들이',18,'L',2],['주사기의 들이',5,'mL',3]];
+
+// ───── 자 ─────
+function rulerSvg(o){
+  const W=240,x0=14,x1=226,cw=(x1-x0)/o.max,yR=58,rh=42;
+  let g=`<rect x="${x0-8}" y="${yR}" width="${x1-x0+16}" height="${rh}" rx="3" fill="#fef3c7" stroke="#b45309" stroke-width="1.4"/>`;
+  for(let mm=0;mm<=o.max*10;mm++){
+    const x=x0+mm*cw/10;
+    if(mm%10===0){g+=`<line x1="${x}" y1="${yR}" x2="${x}" y2="${yR+15}" stroke="#78350f" stroke-width="1.3"/>`+Tx(x,yR+27,mm/10,{size:o.max>12?9:10.5,fill:'#78350f',weight:700});}
+    else if(o.mm&&mm%5===0)g+=`<line x1="${x}" y1="${yR}" x2="${x}" y2="${yR+11}" stroke="#78350f" stroke-width="1"/>`;
+    else if(o.mm)g+=`<line x1="${x}" y1="${yR}" x2="${x}" y2="${yR+7}" stroke="#78350f" stroke-width=".8"/>`;
+  }
+  g+=Tx(x1+5,yR+rh-4,'cm',{size:8,fill:'#78350f',anchor:'end',weight:800});
+  const xs=x0+o.s*cw,xe=x0+o.e*cw,yo=24,hh=15;
+  if(o.guide){g+=`<line x1="${xs}" y1="${yo+hh}" x2="${xs}" y2="${yR}" stroke="#94a3b8" stroke-dasharray="3 2"/><line x1="${xe}" y1="${yo+hh/2}" x2="${xe}" y2="${yR}" stroke="#94a3b8" stroke-dasharray="3 2"/>`;}
+  if(o.kind==='pencil'){
+    const tl=Math.min(16,(xe-xs)*.3);
+    g+=`<rect x="${xs}" y="${yo}" width="${Math.max(4,Math.min(7,(xe-xs)*.12))}" height="${hh}" fill="#f472b6" stroke="#475569"/>`;
+    g+=`<rect x="${xs+6}" y="${yo}" width="${xe-xs-tl-6}" height="${hh}" fill="#facc15" stroke="#475569"/>`;
+    g+=`<path d="M${xe-tl} ${yo} L${xe} ${yo+hh/2} L${xe-tl} ${yo+hh} Z" fill="#fde68a" stroke="#475569"/><path d="M${xe-tl*.35} ${yo+hh*.33} L${xe} ${yo+hh/2} L${xe-tl*.35} ${yo+hh*.67} Z" fill="#334155"/>`;
+  } else {
+    g+=`<rect x="${xs}" y="${yo}" width="${xe-xs}" height="${hh}" rx="3" fill="${o.color||'#60a5fa'}" stroke="#334155"/>`;
+  }
+  return svgWrap(W,106,g);
+}
+function tapeSvg(o){ // o:{max,tick,labelEvery,pt,unit}
+  const W=240,x0=14,x1=226,cw=(x1-x0)/o.max,yT=46,th=34;
+  let g=`<rect x="${x0-8}" y="${yT}" width="${x1-x0+16}" height="${th}" rx="4" fill="#fde047" stroke="#a16207" stroke-width="1.4"/>`;
+  for(let v=0;v<=o.max;v+=o.tick){
+    const x=x0+v*cw,lab=(v%o.labelEvery===0);
+    g+=`<line x1="${x}" y1="${yT}" x2="${x}" y2="${yT+(lab?15:9)}" stroke="#713f12" stroke-width="${lab?1.4:1}"/>`;
+    if(lab)g+=Tx(x,yT+28,o.fmt?o.fmt(v):v,{size:9.5,fill:'#713f12',weight:700});
+  }
+  const xp=x0+o.pt*cw;
+  g+=`<path d="M${xp} ${yT-2} v-24" stroke="#e11d48" stroke-width="2.4"/><path d="M${xp} ${yT-2} l-5 -9 h10 z" fill="#e11d48"/>`;
+  return svgWrap(W,yT+th+8,g);
+}
+// ───── 저울(바늘) ─────
+function dialSvg(sp,v){
+  const W=240,H=172,cx=120,cy=88,R=72,A0=-150,SW=300;
+  const ang=x=>A0+SW*x/sp.max,P=(a,r)=>[cx+r*Math.sin(a*Math.PI/180),cy-r*Math.cos(a*Math.PI/180)];
+  let g=`<circle cx="${cx}" cy="${cy}" r="${R+5}" fill="#e2e8f0" stroke="#475569" stroke-width="2.5"/><circle cx="${cx}" cy="${cy}" r="${R}" fill="#fff" stroke="#94a3b8" stroke-width="1"/>`;
+  for(let t=0;t<=sp.max+1e-9;t+=sp.minor){
+    const major=Math.abs(t/sp.major-Math.round(t/sp.major))<1e-9,a=ang(t),p1=P(a,R-3),p2=P(a,R-(major?13:7));
+    g+=`<line x1="${r2(p1[0])}" y1="${r2(p1[1])}" x2="${r2(p2[0])}" y2="${r2(p2[1])}" stroke="#1e293b" stroke-width="${major?1.8:1}"/>`;
+    if(major){const pl=P(a,R-24);g+=Tx(r2(pl[0]),r2(pl[1]+3.5),sp.lab(Math.round(t*10)/10),{size:sp.lsize||9,weight:700,fill:'#1e293b'});}
+  }
+  g+=Tx(cx,cy+34,sp.unit,{size:12,weight:800,fill:'#64748b'});
+  const pn=P(ang(v),R-9),pt=P(ang(v)+180,12);
+  g+=`<line x1="${r2(pt[0])}" y1="${r2(pt[1])}" x2="${r2(pn[0])}" y2="${r2(pn[1])}" stroke="#dc2626" stroke-width="2.6" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="5" fill="#dc2626"/><circle cx="${cx}" cy="${cy}" r="1.8" fill="#fff"/>`;
+  g+=`<rect x="${cx-34}" y="${cy+R+7}" width="68" height="9" rx="3" fill="#94a3b8"/>`;
+  return svgWrap(W,H,g);
+}
+// ───── 계량컵 ─────
+function cupSvg(sp,v){
+  const W=240,H=182,bx=104,bw=58,top=14,bot=160,hh=bot-top;
+  const yy=t=>bot-hh*t/sp.max;
+  let g=`<path d="M${bx} ${yy(v)} H${bx+bw} V${bot-6} Q${bx+bw} ${bot} ${bx+bw-6} ${bot} H${bx+6} Q${bx} ${bot} ${bx} ${bot-6} Z" fill="#7dd3fc" fill-opacity=".75"/>`;
+  g+=`<line x1="${bx}" y1="${r2(yy(v))}" x2="${bx+bw}" y2="${r2(yy(v))}" stroke="#0284c7" stroke-width="1.6"/>`;
+  g+=`<path d="M${bx-3} ${top-3} L${bx} ${top} V${bot-6} Q${bx} ${bot} ${bx+6} ${bot} H${bx+bw-6} Q${bx+bw} ${bot} ${bx+bw} ${bot-6} V${top} L${bx+bw+3} ${top-3}" fill="none" stroke="#334155" stroke-width="2.2"/>`;
+  for(let t=0;t<=sp.max+1e-9;t+=sp.minor){
+    const major=Math.abs(t/sp.major-Math.round(t/sp.major))<1e-9,y=yy(t);
+    g+=`<line x1="${bx}" y1="${r2(y)}" x2="${bx+(major?16:9)}" y2="${r2(y)}" stroke="#1e293b" stroke-width="${major?1.6:1}"/>`;
+    if(major)g+=Tx(bx-6,r2(y+3.5),sp.lab(Math.round(t*10)/10),{size:9.5,weight:700,anchor:'end',fill:'#1e293b'});
+  }
+  g+=Tx(bx+bw+10,top+8,sp.unit,{size:11,weight:800,fill:'#64748b',anchor:'start'});
+  return svgWrap(W,H,g);
+}
+function qtyViz(label,val,unit){
+  const w=Math.max(54,String(val).length*13+8);
+  const body=`<rect x="12" y="6" width="216" height="52" rx="12" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.6"/>`+Tx(120,26,label,{size:12.5,weight:700,fill:'#115e59'});
+  const tw=String(val).length*12;
+  const xs=120-(tw+62)/2;
+  return svgWrap(240,64,body+Tx(xs+tw/2,50,val,{size:20,weight:900,fill:'#0f172a'})+`<rect x="${xs+tw+8}" y="33" width="52" height="22" rx="6" fill="#fff" stroke="#64748b" stroke-width="1.3" stroke-dasharray="3 2"/>`+ansG(Tx(xs+tw+8+26,50,unit,{size:13,fill:'#ef4444',weight:800})));
+}
+function unitDistract(u){
+  const ks=KIND_UNITS[UNIT_KIND[u]];const others=ks.filter(x=>x!==u);
+  const wr=['cm','m','kg','g','L','mL','t','mm'].filter(x=>UNIT_KIND[x]!==UNIT_KIND[u]);
+  return others.concat(shuffle(wr)).map(U);
+}
+function uj(sym,t){return josaW(UNIT_KO[sym],t);}
+function fmtG(g){return g>=1000?fmtComp('kg',Math.floor(g/1000),'g',g%1000):`${g} ${U('g')}`;}
+function fmtMl(x){return x>=1000?fmtComp('L',Math.floor(x/1000),'mL',x%1000):`${x} ${U('mL')}`;}
+function fmtComp(big,k,small,m){return m===0?`${comma(k)} ${U(big)}`:`${comma(k)} ${U(big)} ${comma(m)} ${U(small)}`;}
+
+const GEN={
+  id:'unit',title:'단위·눈금읽기',
+  levelTitle:'단위·눈금읽기 난이도 세부 설정',optNote:'(단위 표기·눈금 표시 방식)',
+  levels:[
+    {s:'1단계',d:'단위 이름 알기·자(cm)'},
+    {s:'2단계',d:'알맞은 단위 고르기·저울/계량컵'},
+    {s:'3단계',d:'cm·mm·m, 눈금 세밀하게'},
+    {s:'4단계',d:'단위 바꾸기 (한 가지 단위)'},
+    {s:'5단계',d:'단위 바꾸기 (m cm 등)·t'},
+    {s:'6단계',d:'크기 비교·단위 덧셈/뺄셈'}],
+  defLevel:3,
+  checks:[
+    {id:'lowerL',label:'리터·밀리리터를 <b>소문자 l, ml</b>로 표기 (기본: L, mL)',def:false},
+    {id:'hint',label:'<b>단위 관계 힌트</b> 표시 (1 m = 100 cm 등)',def:false},
+    {id:'guide',label:'길이 재기 <b>안내선(점선)</b> 표시',def:true}],
+  selects:[],
+  groups:[
+    {id:'know',label:'단위 알기',types:[
+      {key:'unitName',label:'단위 기호 ↔ 이름 (cm = 센티미터)',short:'단위 이름',minLv:1},
+      {key:'unitKind',label:'무엇을 재는 단위인지 (길이·무게·들이)',short:'단위 종류',minLv:1},
+      {key:'unitMatch',label:'단위 기호와 이름 짝짓기',short:'짝짓기',minLv:1,styles:['subjective','narrative']},
+      {key:'pickUnit',label:'알맞은 단위 고르기',short:'알맞은 단위',minLv:2},
+      {key:'bestMeasure',label:'가장 알맞은 길이·무게·들이 고르기',short:'알맞은 양',minLv:3,styles:['objective']}]},
+    {id:'read',label:'눈금 읽기',types:[
+      {key:'readRuler',label:'자로 길이 재기 (cm, mm)',short:'자 눈금',minLv:1},
+      {key:'readTape',label:'줄자 눈금 읽기 (cm, m)',short:'줄자 눈금',minLv:3},
+      {key:'readScale',label:'저울 눈금 읽기 (g, kg)',short:'저울 눈금',minLv:2},
+      {key:'readCup',label:'계량컵 눈금 읽기 (mL, L)',short:'계량컵 눈금',minLv:2}]},
+    {id:'conv',label:'단위 바꾸기·계산',types:[
+      {key:'convert',label:'단위 바꾸기 (m↔cm, cm↔mm, kg↔g, L↔mL, t↔kg)',short:'단위 바꾸기',minLv:4},
+      {key:'cmpUnits',label:'크기 비교 (3 kg 500 g ○ 3400 g)',short:'크기 비교',minLv:6},
+      {key:'addUnits',label:'단위가 있는 덧셈·뺄셈',short:'단위 덧뺄셈',minLv:6}]}],
+  info(){return [];},
+  build(type,style,lv){
+    const nar=style==='narrative',n=pickName();
+    const mk=(q,viz,ans,distract)=>({q,viz,ans,distract});
+    const HT=(t)=>O().hint?`<span class="text-slate-400"> (${t})</span>`:'';
+    switch(type){
+      case 'unitName':{
+        const us=unitsAt(lv);const u=pick(us);const toKo=chance(.5);
+        if(toKo){const q=nar?`${nm(n,'i')} 공책에 <b>${U(u)}</b>${uj(u,'i')} 써 있는 것을 봤어요. 어떻게 읽을까요?`:`<b>${U(u)}</b>${uj(u,'eun')} 어떻게 읽을까요?`;
+          return mk(q,'',UNIT_KO[u],us.filter(x=>x!==u).map(x=>UNIT_KO[x]));}
+        const q=nar?`${nm(n,'i')} <b>${UNIT_KO[u]}</b>${josaW(UNIT_KO[u],'eul')} 기호로 쓰려고 해요. 어떻게 쓸까요?`:`<b>${UNIT_KO[u]}</b>${josaW(UNIT_KO[u],'eul')} 기호로 쓰세요.`;
+        return mk(q,'',U(u),us.filter(x=>x!==u).map(U));
+      }
+      case 'unitKind':{
+        const us=unitsAt(lv);const u=pick(us);
+        const o=mk(nar?`${nm(n,'i')} <b>${U(u)}</b>${uj(u,'eul')} 보았어요. 이것은 무엇을 재는 단위일까요?`:`<b>${U(u)}</b>${uj(u,'eun')} 무엇을 재는 단위일까요?`,'',UNIT_KIND[u]);
+        o.choices=['길이','무게','들이','시간'];o.correctIdx=o.choices.indexOf(UNIT_KIND[u]);return o;
+      }
+      case 'unitMatch':{
+        const us=sample(unitsAt(lv),4);const rt=shuffle(us.slice());
+        const W=240,rows=4,rh=36;let g='';
+        us.forEach((u,i)=>{const y=14+i*rh;g+=`<rect x="14" y="${y-12}" width="62" height="28" rx="7" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.4"/>`+Tx(45,y+7,U(u),{size:15,weight:800});});
+        rt.forEach((u,i)=>{const y=14+i*rh;g+=`<rect x="146" y="${y-12}" width="80" height="28" rx="7" fill="#fff" stroke="#94a3b8" stroke-width="1.4"/>`+Tx(186,y+6,UNIT_KO[u],{size:11.5,weight:700});});
+        us.forEach((u,i)=>{const j=rt.indexOf(u);g+=ansG(`<line x1="76" y1="${14+i*rh+2}" x2="146" y2="${14+j*rh+2}" stroke="#ef4444" stroke-width="2"/>`);});
+        for(let i=0;i<4;i++){g+=`<circle cx="80" cy="${16+i*rh}" r="3" fill="#475569"/><circle cx="142" cy="${16+i*rh}" r="3" fill="#475569"/>`;}
+        return mk(nar?`${nm(n,'i')} 단위 카드를 짝지으려고 해요. 같은 것끼리 선으로 이어 보세요.`:`단위 기호와 이름을 <b>선으로 이어</b> 보세요.`,svgWrap(W,rows*rh+4,g),us.map(u=>`${U(u)}-${UNIT_KO[u]}`).join(', '),[]);
+      }
+      case 'pickUnit':{
+        const pool=THINGS.filter(t=>t[3]<=Math.max(2,lv));const [label,val,u]=pick(pool);
+        const q=nar?`${nm(n,'i')} ${label}${josaW(label,'eul')} 쟀어요. <b>(  )</b> 안에 알맞은 단위를 쓰세요.`:`<b>(  )</b> 안에 알맞은 단위를 쓰세요.${HT(UNIT_KIND[u]==='길이'?'길이를 재는 단위예요':UNIT_KIND[u]==='무게'?'무게를 재는 단위예요':'들이를 재는 단위예요')}`;
+        return mk(q,qtyViz(label,comma(val),U(u)),U(u),unitDistract(u));
+      }
+      case 'bestMeasure':{
+        const pool=THINGS.filter(t=>t[3]<=Math.max(3,lv));const [label,val,u]=pick(pool);
+        const ks=KIND_UNITS[UNIT_KIND[u]];const wrong=[];
+        ks.filter(x=>x!==u).forEach(x=>wrong.push(`${comma(val)} ${U(x)}`));
+        wrong.push(`${comma(val*10)} ${U(u)}`);if(val>=10&&val%10===0)wrong.push(`${comma(val/10)} ${U(u)}`);wrong.push(`${comma(val*100)} ${U(u)}`);
+        const q=nar?`${nm(n,'i')} ${label}${josaW(label,'eul')} 어림해 보았어요. 가장 알맞은 것은 무엇일까요?`:`<b>${label}</b>로 가장 알맞은 것을 고르세요.`;
+        return mk(q,'',`${comma(val)} ${U(u)}`,wrong);
+      }
+      case 'readRuler':{
+        let s=0,e,kind=pick(['pencil','pencil','bar']),mmT=lv>=2,mm=0,ans,ask;
+        if(lv===1){e=randInt(2,12);ans=`${e} ${U('cm')}`;}
+        else if(lv===2){e=randInt(2,15);ans=`${e} ${U('cm')}`;}
+        else{
+          const mode=pick(['cmmm','cmmm','start','mmonly']);
+          if(mode==='start'){s=randInt(1,5);e=s+randInt(3,10);ans=`${e-s} ${U('cm')}`;}
+          else if(mode==='cmmm'){const c=randInt(2,13);mm=randInt(1,9);e=c+mm/10;ans=`${c} ${U('cm')} ${mm} ${U('mm')}`;}
+          else{const c=randInt(2,13);mm=randInt(1,9);e=c+mm/10;ans=`${c*10+mm} ${U('mm')}`;ask='mm';}
+        }
+        const max=Math.min(16,Math.max(6,Math.ceil(e)+1));
+        const nameObj=kind==='pencil'?'연필':'막대';
+        let q;
+        if(ask==='mm')q=nar?`${nm(n,'i')} 자로 ${nameObj}의 길이를 쟀어요. 길이는 몇 ${U('mm')}일까요?`:`${nameObj}의 길이는 몇 <b>${U('mm')}</b>일까요?${HT('1 cm = 10 mm')}`;
+        else if(mm)q=nar?`${nm(n,'i')} 자로 ${nameObj}의 길이를 쟀어요. 길이는 몇 ${U('cm')} 몇 ${U('mm')}일까요?`:`${nameObj}의 길이는 몇 <b>${U('cm')} 몇 ${U('mm')}</b>일까요?`;
+        else if(s>0)q=`${nameObj}의 <b>길이</b>는 몇 ${U('cm')}일까요? <span class="text-slate-400">(눈금 ${s}에서 시작해요)</span>`;
+        else q=nar?`${nm(n,'i')} 자로 ${nameObj}의 길이를 쟀어요. 길이는 몇 ${U('cm')}일까요?`:`${nameObj}의 길이는 몇 <b>${U('cm')}</b>일까요?`;
+        const num=parseInt(ans);const dis=[];
+        if(ask==='mm'){[num+1,num-1,num+10,num-10,num+9].forEach(x=>x>0&&dis.push(`${x} ${U('mm')}`));}
+        else if(mm){const c=Math.floor(e);[[c,mm+1],[c,mm-1],[c+1,mm],[c-1,mm],[mm,c]].forEach(([a,b])=>{if(a>0&&b>0&&b<10)dis.push(`${a} ${U('cm')} ${b} ${U('mm')}`);});}
+        else{[num+1,num-1,num+2,num-2].forEach(x=>x>0&&dis.push(`${x} ${U('cm')}`));}
+        return mk(q,rulerSvg({max,s,e,kind,mm:mmT,guide:O().guide}),ans,dis);
+      }
+      case 'readTape':{
+        const big=(lv>=5)&&chance(.6);
+        let sp,v,ans,dis;
+        if(!big){sp={max:100,tick:5,labelEvery:10,pt:0};v=randInt(2,19)*5;sp.pt=v;ans=`${v} ${U('cm')}`;dis=[v+5,v-5,v+10,v-10,v+1].filter(x=>x>0&&x<=100).map(x=>`${x} ${U('cm')}`);
+          return mk(nar?`${nm(n,'i')} 줄자로 책상 길이를 쟀어요. ↓가 가리키는 길이는 몇 ${U('cm')}일까요?`:`줄자의 <b>↓</b>가 가리키는 길이는 몇 <b>${U('cm')}</b>일까요?`,tapeSvg({max:100,tick:5,labelEvery:10,pt:v}),ans,dis);}
+        const M=pick([2,3]);v=randInt(11,M*10-1)*10;if(v%100===0)v+=10;
+        ans=fmtComp('m',Math.floor(v/100),'cm',v%100);
+        dis=[v+10,v-10,v+100,v-100,v+50].filter(x=>x>0&&x<M*100&&x%100!==0).map(x=>fmtComp('m',Math.floor(x/100),'cm',x%100));
+        return mk(nar?`${nm(n,'i')} 줄자로 길이를 쟀어요. ↓가 가리키는 길이는 몇 ${U('m')} 몇 ${U('cm')}일까요?`:`줄자의 <b>↓</b>가 가리키는 길이는 몇 <b>${U('m')} 몇 ${U('cm')}</b>일까요?${HT('1 m = 100 cm')}`,tapeSvg({max:M*100,tick:10,labelEvery:50,pt:v,fmt:x=>x===0?'0':(x%100===0?(x/100)+'m':String(x))}),ans,dis);
+      }
+      case 'readScale':{
+        const specs=[{max:1000,major:100,minor:50,unit:'g',lab:x=>x,lsize:8.6,kg:false},{max:1000,major:100,minor:20,unit:'g',lab:x=>x,lsize:8.6,kg:false},{max:5,major:1,minor:.1,unit:'kg',lab:x=>x,lsize:11,kg:true},{max:2,major:.5,minor:.1,unit:'kg',lab:x=>String(x),lsize:10.5,kg:true}];
+        const sp=lv<=2?specs[0]:lv===3?pick([specs[1],specs[2]]):pick([specs[1],specs[2],specs[3]]);
+        let v,ans,dis;
+        if(!sp.kg){const mi=sp.minor;do{v=randInt(1,sp.max/mi-1)*mi;}while(v%sp.major===0&&chance(.7));ans=`${v} ${U('g')}`;dis=[v+mi,v-mi,v+2*mi,v-2*mi,v+sp.major].filter(x=>x>0&&x<sp.max).map(x=>`${x} ${U('g')}`);}
+        else{const steps=Math.round(sp.max/.1);const k=randInt(1,steps-1);v=Math.round(k*10)/100;const g=Math.round(v*1000);ans=fmtG(g);
+          dis=[g+100,g-100,g+200,g-200,g+1000].filter(x=>x>0&&x<sp.max*1000).map(fmtG);}
+        const gOnly=sp.kg&&Math.round(v*1000)<1000;
+        const q=sp.kg&&!gOnly?`저울의 바늘이 가리키는 무게는 몇 <b>${U('kg')} 몇 ${U('g')}</b>일까요?${HT('눈금 한 칸은 100 g')}`:sp.kg?`저울의 바늘이 가리키는 무게는 몇 <b>${U('g')}</b>일까요?${HT('눈금 한 칸은 100 g')}`:`저울의 바늘이 가리키는 무게는 몇 <b>${U('g')}</b>일까요?${HT('눈금 한 칸의 크기를 먼저 알아봐요')}`;
+        const q2=nar?`${nm(n,'i')} 과일을 저울에 올렸어요. ${q}`:q;
+        const dsp=sp.kg?{max:sp.max,major:sp.major,minor:sp.minor,unit:'kg',lab:sp.lab,lsize:sp.lsize}:sp;
+        return mk(q2,dialSvg(dsp,sp.kg?v:v),ans,dis);
+      }
+      case 'readCup':{
+        const specs=[{max:500,major:100,minor:50,unit:U('mL'),lab:x=>x,L:false},{max:1000,major:200,minor:100,unit:U('mL'),lab:x=>x,L:false},{max:1000,major:100,minor:50,unit:U('mL'),lab:x=>x,L:false},{max:2000,major:500,minor:100,unit:U('mL'),lab:x=>x,L:true}];
+        const sp=lv<=2?specs[0]:lv===3?pick([specs[1],specs[2]]):pick([specs[1],specs[2],specs[3],specs[3]]);
+        const mi=sp.minor;let v;do{v=randInt(1,sp.max/mi-1)*mi;}while(v%sp.major===0&&chance(.6));
+        let ans,dis;
+        if(sp.L){ans=fmtMl(v);dis=[v+100,v-100,v+200,v-200,v+1000,v-1000].filter(x=>x>0&&x<sp.max).map(fmtMl);}
+        else{ans=`${v} ${U('mL')}`;dis=[v+mi,v-mi,v+2*mi,v-2*mi,v+sp.major].filter(x=>x>0&&x<sp.max).map(x=>`${x} ${U('mL')}`);}
+        const q=(sp.L&&v>=1000)?`물의 양은 몇 <b>${U('L')} 몇 ${U('mL')}</b>일까요?${HT('1 L = 1000 mL')}`:`물의 양은 몇 <b>${U('mL')}</b>일까요?${HT('눈금 한 칸의 크기를 먼저 알아봐요')}`;
+        const q2=nar?`${nm(n,'i')} 계량컵에 물을 부었어요. ${q}`:q;
+        return mk(q2,cupSvg(sp,v),ans,dis);
+      }
+      case 'convert':{
+        const kinds=lv>=5?['length','length','weight','weight','volume','tons']:['length','length','weight','volume'];
+        const kind=pick(kinds);
+        const defs={length:[['m','cm',100],['cm','mm',10]],weight:[['kg','g',1000]],volume:[['L','mL',1000]],tons:[['t','kg',1000]]}[kind];
+        const [big,small,f]=pick(defs);const bs=U(big),ss=U(small);
+        const hintTxt=`1 ${bs} = ${comma(f)} ${ss}`;
+        let q,ans,dis,A;
+        if(lv===4){
+          const k=randInt(2,9);
+          if(chance(.5)){A=k*f;q=`<b>${k} ${bs}</b> = ( ) ${ss}`;ans=`${comma(A)} ${ss}`;dis=[A*10,A/10,A+f,A-f,A*100].filter(x=>x>0&&Number.isInteger(x)).map(x=>`${comma(x)} ${ss}`);}
+          else{A=k*f;q=`<b>${comma(A)} ${ss}</b> = ( ) ${bs}`;ans=`${k} ${bs}`;dis=[k*10,k+1,k-1,k*100,k+2].filter(x=>x>0).map(x=>`${comma(x)} ${bs}`);}
+        } else {
+          const k=randInt(1,lv>=6?30:9);const m=f===10?randInt(1,9):(chance(.5)?randInt(1,9)*(f/10):randInt(1,f-1));
+          const total=k*f+m;
+          const step=Math.max(1,f/10);
+          if(chance(.5)){q=`<b>${k} ${bs} ${m} ${ss}</b> = ( ) ${ss}`;ans=`${comma(total)} ${ss}`;
+            dis=[total+f,total-f,Number(`${k}${m}`),total*10,k*f+m*10,total+step,total-step].filter(x=>x>0&&x!==total&&Number.isInteger(x)).map(x=>`${comma(x)} ${ss}`);}
+          else{q=`<b>${comma(total)} ${ss}</b> = ( ) ${bs} ( ) ${ss}`;ans=fmtComp(big,k,small,m);
+            dis=[[m,k],[k+1,m],[k-1,m],[k,m+step],[k,m-step],[k*10,m],[k,m*10]].filter(([a,b])=>a>0&&b>0&&b<f&&!(a===k&&b===m)).map(([a,b])=>fmtComp(big,a,small,b));}
+        }
+        const qq=nar?`${nm(n,'i')} 단위를 바꾸어 보려고 해요. ${q}`:q;
+        return mk(qq+HT(hintTxt),'',ans,dis);
+      }
+      case 'cmpUnits':{
+        const kind=pick(['length','weight','volume']);
+        const [big,small,f]={length:['m','cm',100],weight:['kg','g',1000],volume:['L','mL',1000]}[kind];
+        const k=randInt(1,9),m=randInt(1,9)*(f/10);const a=k*f+m;
+        const r=pick(['eq','gt','lt','gt','lt']);let b=a;
+        if(r==='gt')b=a-randInt(1,3)*(f/10);if(r==='lt')b=a+randInt(1,3)*(f/10);
+        if(b<=0)return null;
+        const left=chance(.5)?`${k} ${U(big)} ${m} ${U(small)}`:`${comma(a)} ${U(small)}`;
+        const right=left.includes(U(big))?`${comma(b)} ${U(small)}`:`${Math.floor(b/f)} ${U(big)} ${b%f} ${U(small)}`;
+        if(b%f===0&&!left.includes(U(big)))return null;
+        const L=left,R=right;const sym=a>b?'>':a<b?'<':'=';
+        const viz=svgWrap(240,64,Tx(56,38,L,{size:L.length>9?12:14,weight:800,anchor:'middle'})+`<circle cx="120" cy="32" r="14" fill="#fff" stroke="#64748b" stroke-width="1.6"/>`+ansG(Tx(120,38,sym.replace('>','&gt;').replace('<','&lt;'),{size:17,fill:'#ef4444',weight:900}))+Tx(184,38,R,{size:R.length>9?12:14,weight:800,anchor:'middle'}));
+        const o=mk(nar?`${nm(n,'i')} 두 양을 비교하려고 해요. ○ 안에 <b>&gt;, &lt;, =</b> 중 알맞은 것을 써넣으세요.`:`○ 안에 <b>&gt;, &lt;, =</b> 중 알맞은 것을 써넣으세요.${HT(`1 ${U(big)} = ${comma(f)} ${U(small)}`)}`,viz,sym.replace('>','&gt;').replace('<','&lt;'));
+        o.choices=['&gt;','&lt;','='];o.correctIdx=o.choices.indexOf(o.ans);
+        return o;
+      }
+      case 'addUnits':{
+        const kind=pick(['length','weight','volume']);
+        const [big,small,f]={length:['m','cm',100],weight:['kg','g',1000],volume:['L','mL',1000]}[kind];
+        const step=f/10;let a,b,r,op;
+        const k1=randInt(1,6),k2=randInt(1,5),m1=randInt(1,9)*step,m2=randInt(1,9)*step;
+        if(chance(.5)){op='+';a=k1*f+m1;b=k2*f+m2;r=a+b;}
+        else{op='-';a=Math.max(k1,k2)*f+m1+(k1===k2?f:0);b=Math.min(k1,k2)*f+m2;if(a<=b){a+=f;}r=a-b;}
+        if(r%f===0)return null;
+        const fa=fmtComp(big,Math.floor(a/f),small,a%f),fb=fmtComp(big,Math.floor(b/f),small,b%f);
+        if(a%f===0||b%f===0)return null;
+        const ans=fmtComp(big,Math.floor(r/f),small,r%f);
+        const dis=[r+step,r-step,r+f,r-f,r+2*step].filter(x=>x>0&&x%f!==0).map(x=>fmtComp(big,Math.floor(x/f),small,x%f));
+        const q=nar?`${nm(n,'i')} ${op==='+'?'두 양을 더해 보려고':'큰 양에서 작은 양을 빼 보려고'} 해요. <b>${fa} ${op} ${fb}</b> = ( )`:`<b>${fa} ${op==='+'?'+':'−'} ${fb}</b> = ( )${HT(`1 ${U(big)} = ${comma(f)} ${U(small)}`)}`;
+        return mk(q,'',ans,dis);
+      }
+    }
+    return null;
+  }
+};
+
+// ───────── 시작 ─────────
+window.regenerateSheet=regenerateSheet;window.toggleAnswers=toggleAnswers;window.printSheet=printSheet;
+window.setPagesDropdown=setPagesDropdown;window.updateQuestionsCount=updateQuestionsCount;window.toggleGroup=toggleGroup;
+function initApp(){initConfig();buildPanel();initDate();if(tryAnswerView())return;setupTypeWeights();regenerateSheet();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initApp);else initApp();
+
+  </script>
+</body>
+</html>

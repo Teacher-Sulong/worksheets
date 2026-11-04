@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>[수학] 그래프 읽기 맞춤형 학습지 생성기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+    body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; }
+    @media print {
+      html, body { background-color: #fff !important; height: auto !important; min-height: auto !important; overflow: visible !important; }
+      .no-print { display: none !important; }
+      main { display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
+      #print-pages-container { display: block !important; width: 100% !important; }
+      .print-area {
+        width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 6mm !important;
+        box-sizing: border-box !important; box-shadow: none !important; border: none !important;
+        page-break-after: always !important; break-after: page !important; page-break-inside: avoid !important;
+        height: 285mm !important; overflow: hidden !important;
+      }
+      .print-area:last-child { page-break-after: auto !important; break-after: auto !important; }
+      @page { size: A4; margin: 6mm; }
+    }
+    body.answer-view #main-header, body.answer-view #option-panel,
+    body.answer-view #print-control-toolbar, body.answer-view footer { display: none !important; }
+    body.answer-view main { display: block; padding: 10px; max-width: 900px; margin: 0 auto; }
+    body.answer-view .print-area { box-shadow: none; border-color: #e2e8f0; }
+    .print-area.big-mode .qtext-el { font-size: 14.5px !important; line-height: 1.55 !important; }
+    .print-area.big-mode .answer-box { font-size: 14px !important; }
+    /* 그림(SVG) 영역 */
+    .viz { display: block; margin: 2px auto; width: 100%; height: auto; max-height: var(--vmax, 190px); }
+    .ansonly { visibility: hidden; }
+    .show-ans .ansonly { visibility: visible; }
+    .choice-svg { display: inline-block; vertical-align: middle; width: 30px; height: 30px; }
+    .vtable { border-collapse: collapse; margin: 3px auto; }
+    .vtable td, .vtable th { border: 1px solid #94a3b8; text-align: center; padding: 0; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+  <header id="main-header" class="bg-rose-600 text-white shadow-md py-4 px-6 no-print">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <i data-lucide="bar-chart-3" class="w-8 h-8 text-yellow-300"></i>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">[수학] 그래프 읽기 맞춤형 학습지 생성기</h1>
+          <p class="text-xs text-rose-100">수학 교육과정 기반 맞춤형 문제 자동 생성 플랫폼 · <b class="text-yellow-200">made by 특수교사 슬옹쌤</b></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-sm text-rose-50 bg-black/20 px-3 py-1.5 rounded-lg">
+        <i data-lucide="info" class="w-4 h-4"></i>
+        <span>정확한 인쇄를 위해 <b>[배경 그래픽 인쇄]</b> 옵션을 켜주세요.</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-6">
+    <section id="option-panel" class="w-full md:w-96 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 shrink-0 self-start no-print"></section>
+
+    <section class="flex-1 flex flex-col gap-6">
+      <div id="print-control-toolbar" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center no-print">
+        <span class="text-sm font-medium text-slate-500">실시간 학습지 미리보기</span>
+        <select id="qr-mode" title="QR에 무엇을 담을지" onchange="QR_MODE=this.value;makeQRCodes();" class="ml-auto mr-2 rounded-lg border border-slate-200 px-2 py-2 text-xs bg-white font-semibold text-slate-600"><option value="link">QR: 정답지 페이지 열기</option><option value="text">QR: 정답 글자 (로그인 불필요)</option></select>
+          <button onclick="printSheet()" class="bg-rose-600 hover:opacity-90 text-white font-bold px-5 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md">
+          <i data-lucide="printer" class="w-5 h-5"></i> 인쇄 및 PDF 저장
+        </button>
+      </div>
+      <div id="print-pages-container" class="space-y-6"></div>
+    </section>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs mt-12 no-print border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 space-y-2">
+      <p>본 학습지는 자료와 가능성 영역의 분류·표·그림그래프·막대그래프·꺾은선그래프·원그래프 내용 요소를 참고하여 구성했습니다.</p>
+      <p>© 2026 그래프 읽기 맞춤형 학습지 · <b class="text-slate-200">made by 특수교사 슬옹쌤</b></p>
+    </div>
+  </footer>
+
+  <script>
+    // ── QR 정답지 설정: 스캔하면 이 생성기의 정답지 화면이 바로 열려요 ──
+    const ANSWER_URL = 'https://teacher-sulong.github.io/worksheets/graph.html';
+    let QR_MODE = 'link';
+    // 정답지 화면: 휴대폰 화면 폭에 학습지 한 장이 통째로 보이도록 맞춤
+    function fitAnswerView(){ if(!document.body.classList.contains('answer-view'))return; var c=document.getElementById('print-pages-container'); if(!c)return; c.style.zoom=Math.min(1,(window.innerWidth-12)/850); }
+    window.addEventListener('resize', fitAnswerView);
+    window.addEventListener('hashchange', function () { if (/^#k[-=]/.test(location.hash)) location.reload(); });
+// ═════════════════════ 공통 코어 (시계·달력 생성기와 동일한 구성) ═════════════════════
+// ───────── 시드 난수 (QR 재현용) ─────────
+function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+let rng = Math.random;
+function randInt(a,b){return Math.floor(rng()*(b-a+1))+a;}
+function pick(arr){return arr[Math.floor(rng()*arr.length)];}
+function shuffle(a){const r=a.slice();for(let i=r.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));const t=r[i];r[i]=r[j];r[j]=t;}return r;}
+function sample(a,n){return shuffle(a).slice(0,n);}
+function chance(p){return rng()<p;}
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return h>>>0;}
+function comma(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function plain(h){return String(h).replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();}
+function uniq(a){return [...new Set(a)];}
+function sum(a){return a.reduce((x,y)=>x+y,0);}
+
+// ───────── 한국어 조사 ─────────
+const NAMES=['이준','하준','도윤','서준','은우','시우','유준','주원','서윤','서아','이서','지유','하린','아린','시아','하은','소율','채원'];
+function hasBatchim(w){if(!w)return false;const c=w.charCodeAt(w.length-1);if(c<0xac00||c>0xd7a3)return false;return (c-0xac00)%28>0;}
+function dispName(n){return n+(hasBatchim(n)?'이':'');}
+function josaW(w,t){const b=hasBatchim(w);if(t==='eun')return b?'은':'는';if(t==='i')return b?'이':'가';if(t==='eul')return b?'을':'를';if(t==='wa')return b?'과':'와';if(t==='ro')return b?'으로':'로';return '';}
+function josaNum(s,t){const d=String(s).replace(/[^0-9]/g,'').slice(-1);const b='013678'.includes(d||'2');if(t==='eun')return b?'은':'는';if(t==='i')return b?'이':'가';if(t==='eul')return b?'을':'를';if(t==='wa')return b?'과':'와';return '';}
+function pickName(){return pick(NAMES);}
+function nm(n,t){const d=dispName(n);return d+josaW(d,t);}   // nm('하준','i') → 하준이가
+function jw(w,t){return w+josaW(w,t);}                       // jw('사과','eul') → 사과를
+
+// ───────── SVG 헬퍼 ─────────
+let _u=0;function uid(){return 'u'+(++_u);}
+function svgWrap(w,h,inner,cls){return `<svg class="viz ${cls||''}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" font-family="'Noto Sans KR',sans-serif">${inner}</svg>`;}
+function Tx(x,y,s,o){o=o||{};const size=o.size||12,fill=o.fill||'#1e293b',anchor=o.anchor||'middle',weight=o.weight||600;return `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}"${o.rot?` transform="rotate(${o.rot} ${x} ${y})"`:''}${o.op?` opacity="${o.op}"`:''}>${s}</text>`;}
+function ansG(inner){return `<g class="ansonly">${inner}</g>`;}
+function rnd1(n){return Math.round(n*10)/10;}
+function r2(n){return Math.round(n*100)/100;}
+
+// ───────── 상태 ─────────
+const ALL_S=['subjective','objective','narrative'];
+const KOREAN_STYLES={subjective:'주관식',objective:'객관식',narrative:'문장제'};
+let ALL_T=[],TYPE={};
+const O=()=>config.opt;
+let config=null,generatedPages=[],pageSeeds=[],showAnswers=false,answerViewMode=false;
+
+function initConfig(){
+  GEN.groups.forEach(g=>g.types.forEach(t=>{ALL_T.push(t.key);TYPE[t.key]=t;}));
+  config={pages:2,questionsPerPage:9,level:GEN.defLevel,progression:'single',bigMode:false,boldKey:true,opt:{},sel:{},
+    styles:ALL_S.slice(),types:ALL_T.slice(),typeWeights:{},dateStr:''};
+  GEN.checks.forEach(c=>config.opt[c.id]=!!c.def);
+  GEN.selects.forEach(s=>config.sel[s.id]=s.def);
+}
+
+// ───────── 문제 생성 ─────────
+function perQLevel(gi,total){
+  const L=config.level,mode=config.progression;
+  if(mode==='single'||L<=1||total<=1)return L;
+  const r=gi/(total-1);let v;
+  if(mode==='asc')v=1+Math.round(r*(L-1));
+  else if(mode==='desc')v=1+Math.round((1-r)*(L-1));
+  else v=randInt(1,L);
+  return Math.max(1,Math.min(L,v));
+}
+function makeQuestion(type,style,lv){
+  const o=GEN.build(type,style,lv);
+  if(!o)return null;
+  o.type=type;o.style=style;o.lv=lv;
+  if(!o.viz)o.viz='';
+  if(style==='objective'){
+    if(!o.choices){
+      const a=String(o.ans);
+      const ds=uniq((o.distract||[]).map(String)).filter(x=>x!==a);
+      if(ds.length<3)return null;
+      const ch=shuffle([a].concat(shuffle(ds).slice(0,3)));
+      o.choices=ch;o.correctIdx=ch.indexOf(a);
+    }
+    o.ansKey=(o.correctIdx+1)+'번';
+  } else {
+    o.ansKey=plain(o.ans);
+  }
+  return o;
+}
+function buildPageQuestions(seed,pIdx){
+  rng=mulberry32(seed>>>0);
+  const qpp=config.questionsPerPage,total=config.pages*qpp,out=[],seen=new Set();
+  const selT=ALL_T.filter(t=>config.types.includes(t));const types=selT.length?selT:[ALL_T[0]];
+  const selS=ALL_S.filter(s=>config.styles.includes(s));const styles=selS.length?selS:['subjective'];
+  for(let q=0;q<qpp;q++){
+    const gi=pIdx*qpp+q;const lv=perQLevel(gi,total);
+    const dist=t=>{const T=TYPE[t];return lv<T.minLv?T.minLv-lv:(lv>(T.maxLv||99)?lv-(T.maxLv||99):0);};
+    let cand=types.filter(t=>dist(t)===0);
+    if(!cand.length){const md=Math.min(...types.map(dist));cand=types.filter(t=>dist(t)===md);}
+    const pool=[];
+    cand.forEach(t=>{let w=Math.max(1,Math.min(5,config.typeWeights[t]||1));if(TYPE[t].minLv>=lv-1&&TYPE[t].minLv>1)w*=2;for(let i=0;i<w;i++)pool.push(t);});
+    let o=null;
+    for(let n=0;n<40;n++){
+      const type=pool[Math.floor(rng()*pool.length)];const T=TYPE[type];
+      const eLv=Math.max(T.minLv,Math.min(T.maxLv||99,lv));
+      const allowed=T.styles||ALL_S;let av=styles.filter(s=>allowed.includes(s));if(!av.length)av=[allowed[0]];
+      const style=pick(av);
+      let c=null;
+      try{c=makeQuestion(type,style,eLv);}catch(e){console.error('build error',type,e&&e.stack||e);c=null;}
+      if(!c)continue;
+      const sig=hash(plain(c.q)+'|'+c.ansKey+'|'+String(c.viz).replace(/u\d+/g,''));
+      if(!seen.has(sig)||n>=39){o=c;seen.add(sig);break;}
+    }
+    if(!o){
+      try{o=makeQuestion(types[0],'subjective',Math.max(TYPE[types[0]].minLv,Math.min(TYPE[types[0]].maxLv||99,lv)));}catch(e){console.error('fallback error',e);}
+    }
+    if(!o)o={q:'(문제 생성 오류)',viz:'',ans:'-',ansKey:'-',style:'subjective',type:types[0],lv:lv};
+    o.seq=q;out.push(o);
+  }
+  out.forEach((o,i)=>{o.num=i+1;o.globalNum=pIdx*qpp+i+1;});
+  return out;
+}
+
+// ───────── QR 자동 채점 (상태 인코딩) ─────────
+function encodeState(seed,pIdx){
+  let tmask=0;ALL_T.forEach((t,i)=>{if(config.types.includes(t))tmask|=(1<<i);});
+  let smask=0;ALL_S.forEach((s,i)=>{if(config.styles.includes(s))smask|=(1<<i);});
+  let flags=(config.bigMode?1:0)|(config.boldKey?2:0);
+  GEN.checks.forEach((c,i)=>{if(config.opt[c.id])flags|=(1<<(2+i));});
+  const parts=[flags,tmask,smask,config.questionsPerPage,config.pages,pIdx,(seed>>>0),config.level,({single:0,asc:1,desc:2,mix:3}[config.progression]||0)];
+  GEN.selects.forEach(s=>{parts.push(Math.max(0,s.options.findIndex(o=>o[0]===config.sel[s.id])));});
+  let wStr='',any=false;ALL_T.forEach(t=>{const w=Math.max(1,Math.min(5,config.typeWeights[t]||1));if(w!==1)any=true;wStr+=String(w);});
+  const out=parts.map(n=>n.toString(36));if(any)out.push(wStr);return out.join('-');
+}
+function decodeState(str){
+  const tok=str.split(/[.-]/);const nSel=GEN.selects.length;const p=tok.map((x,i)=>i<9+nSel?parseInt(x,36):x);
+  const flags=p[0];const wStr=(tok.length>9+nSel)?tok[9+nSel]:null;
+  const w={};ALL_T.forEach((t,i)=>{w[t]=wStr?(parseInt(wStr[i],10)||1):1;});
+  const opt={};GEN.checks.forEach((c,i)=>{opt[c.id]=!!(flags&(1<<(2+i)));});
+  const sel={};GEN.selects.forEach((s,i)=>{const o=s.options[p[9+i]];sel[s.id]=o?o[0]:s.def;});
+  return {big:(flags&1)?1:0,bk:(flags&2)?1:0,opt,sel,ty:ALL_T.filter((t,i)=>p[1]&(1<<i)),st:ALL_S.filter((s,i)=>p[2]&(1<<i)),qpp:p[3],pg:p[4],p:p[5],sd:(p[6]>>>0),lv:p[7]||1,prog:({0:'single',1:'asc',2:'desc',3:'mix'}[p[8]]||'single'),w};
+}
+function applyState(s){
+  config.bigMode=!!s.big;config.boldKey=!!s.bk;config.opt=s.opt;config.sel=s.sel;config.level=s.lv;config.progression=s.prog||'single';
+  config.styles=(s.st&&s.st.length)?s.st:['subjective'];config.types=(s.ty&&s.ty.length)?s.ty:[ALL_T[0]];
+  config.questionsPerPage=s.qpp;config.pages=s.pg;config.typeWeights=s.w||{};
+}
+function buildAnswerKeyText(pIdx){const qs=generatedPages[pIdx]||[];return qs.map(q=>`${q.globalNum}) ${q.ansKey}`).join('  ');}
+function makeQRCodes(){
+  if(typeof qrcode==='undefined')return;
+  try{if(qrcode.stringToBytesFuncs&&qrcode.stringToBytesFuncs['UTF-8'])qrcode.stringToBytes=qrcode.stringToBytesFuncs['UTF-8'];}catch(e){}
+  const hosted=(QR_MODE!=='text')&&(!!ANSWER_URL||/^https?:$/.test(location.protocol));const base=hosted?(ANSWER_URL||location.href.split('#')[0]):'';
+  generatedPages.forEach((_,pIdx)=>{
+    const el=document.getElementById('qr-'+pIdx);if(!el)return;
+    const data=hosted?(base+'#k-'+encodeState(pageSeeds[pIdx],pIdx)):buildAnswerKeyText(pIdx);
+    const draw=(txt,ec)=>{const qr=qrcode(0,ec);qr.addData(txt,'Byte');qr.make();el.innerHTML=qr.createSvgTag({cellSize:4,margin:3,scalable:true});const svg=el.querySelector('svg');if(svg){svg.setAttribute('width','100%');svg.setAttribute('height','100%');svg.style.display='block';}};
+    try{draw(data,'L');}catch(e){try{draw(data,'M');}catch(e2){el.innerHTML='<span class="text-[7px] text-slate-400">QR</span>';}}
+  });
+}
+function tryAnswerView(){
+  const h=location.hash||'';const i=h.search(/k[-=]/);if(i<0)return false;
+  let s;try{s=decodeState(h.slice(i+2));}catch(e){return false;}if(!s||s.sd===undefined||isNaN(s.sd))return false;
+  applyState(s);answerViewMode=true;showAnswers=true;
+  generatedPages=[buildPageQuestions(s.sd>>>0,s.p)];pageSeeds=[s.sd>>>0];
+  document.body.classList.add('answer-view');setTimeout(fitAnswerView,30);renderHTML();
+  document.querySelectorAll('.answer-box').forEach(el=>{el.classList.remove('invisible','opacity-0');el.classList.add('visible','opacity-100');});
+  const cont=document.getElementById('print-pages-container');
+  if(cont)cont.insertAdjacentHTML('afterbegin','<div class="max-w-[840px] mx-auto mb-3 bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold flex items-center justify-between"><span>✔ 정답지 (채점용) — made by 특수교사 슬옹쌤</span></div>');
+  tryIcons();return true;
+}
+
+// ───────── 옵션 패널 (동적 구성) ─────────
+function buildPanel(){
+  const C='rose-600';
+  const lvOpts=GEN.levels.map((l,i)=>`<option value="${i+1}"${(i+1)===GEN.defLevel?' selected':''}>${l.s} (${l.d})</option>`).join('');
+  const checks=GEN.checks.map(c=>`<label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-${c.id}" class="w-4 h-4 text-${C} rounded"${c.def?' checked':''} onchange="regenerateSheet()"><span>${c.label}</span></label>`).join('');
+  const sels=GEN.selects.map(s=>`<div class="space-y-3"><label class="block text-sm font-semibold text-slate-700">${s.title}</label><div class="grid grid-cols-${Math.min(3,s.options.length)} gap-2">${s.options.map(o=>`<label class="cursor-pointer border border-slate-200 rounded-lg p-2 flex flex-col items-center gap-1 bg-white hover:bg-slate-50 [&:has(input:checked)]:border-${C} [&:has(input:checked)]:bg-rose-50"><input type="radio" name="sel-${s.id}" value="${o[0]}" class="sr-only"${o[0]===s.def?' checked':''} onchange="regenerateSheet()"><span class="text-xs font-semibold text-center">${o[1]}</span></label>`).join('')}</div>${s.note?`<p class="text-xs text-slate-400">${s.note}</p>`:''}</div>`).join('');
+  const groups=GEN.groups.map(g=>`<div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">${g.label}</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-toggle w-3.5 h-3.5 text-${C} rounded" data-grp="grp-${g.id}" checked onchange="toggleGroup(this,'grp-${g.id}')">전체</label></div>
+        <div id="grp-${g.id}" class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">${g.types.map(t=>`<label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-${C} rounded" value="${t.key}" checked onchange="regenerateSheet()"><span>${t.label}</span></label>`).join('')}</div>`).join('');
+  document.getElementById('option-panel').innerHTML=`
+      <div class="flex items-center gap-2 pb-4 border-b border-slate-100">
+        <i data-lucide="sliders" class="w-5 h-5 text-${C}"></i>
+        <h2 class="text-lg font-bold text-slate-950">학습지 형성 옵션</h2>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">인쇄 페이지 수 (최대 10장)</label>
+        <select id="sheet-pages" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none font-medium" onchange="setPagesDropdown(this.value)">
+          ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${n===2?' selected':''}>${n}장 ${n===10?'대량 생성':'생성'}</option>`).join('')}
+        </select>
+        <p class="text-xs text-slate-400">각 페이지당 최대 9개의 문제가 포함됩니다.</p>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700 flex justify-between"><span>페이지당 문제 수</span><span id="num-of-questions-val" class="text-${C} font-bold">9개</span></label>
+        <input type="range" id="questions-count" min="1" max="9" value="9" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-${C}" oninput="updateQuestionsCount(this.value)">
+        <div class="flex justify-between text-[10px] text-slate-400"><span>1개</span><span>3개 (1줄)</span><span>6개 (2줄)</span><span>9개 (3줄)</span></div>
+      </div>
+      <div class="space-y-3">
+        <label for="difficulty" class="block text-sm font-semibold text-slate-700">${GEN.levelTitle}</label>
+        <select id="difficulty" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none" onchange="regenerateSheet()">${lvOpts}</select>
+      </div>
+      <div class="space-y-3">
+        <label for="progression" class="block text-sm font-semibold text-slate-700">난이도 배치 방식</label>
+        <select id="progression" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none" onchange="regenerateSheet()">
+          <option value="single" selected>단일 (선택한 단계로 고정)</option>
+          <option value="asc">쉬움 → 어려움 (오름차순)</option>
+          <option value="desc">어려움 → 쉬움 (내림차순)</option>
+          <option value="mix">혼합 (무작위 섞기)</option>
+        </select>
+        <p class="text-xs text-slate-400">단일이 아니면 위에서 고른 단계를 <b>최고 난이도</b>로 보고 1단계부터 분배합니다.</p>
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">세부 옵션 설정 <span class="text-[11px] font-normal text-slate-400">${GEN.optNote}</span></label>
+        <div class="space-y-2 bg-slate-50 border border-slate-100 rounded-lg p-3">
+          ${checks}
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-big" class="w-4 h-4 text-${C} rounded" onchange="regenerateSheet()"><span><b>큰 글씨·큰 그림</b> <span class="text-[10px] text-${C} font-semibold">(적정 6문제 추천)</span></span></label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-boldkey" class="w-4 h-4 text-${C} rounded" checked onchange="regenerateSheet()"><span>문제의 <b>중요 부분 볼드 처리</b> (끄면 균일한 글씨)</span></label>
+        </div>
+      </div>
+      ${sels}
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">문제 문항 방식 (중복 선택)</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-subjective" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>주관식 (일반 서술형)</span></label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-objective" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>객관식 (4지 선다형)</span></label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-narrative" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>문장제 (실생활 맥락 시나리오)</span></label>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">수학 문제 세부 유형</label>
+        <p class="text-[11px] text-slate-400 leading-relaxed">각 항목 오른쪽 숫자(1~5)로 <b>출제 비중</b>을, 영역 제목 옆 <b>전체</b> 체크로 해당 영역을 한 번에 켜고 끌 수 있어요.</p>
+        ${groups}
+      </div>
+      <div class="pt-4 border-t border-slate-100 flex flex-col gap-2">
+        <button onclick="regenerateSheet()" class="w-full bg-slate-900 text-white font-bold py-3 px-4 rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4"></i> 새로운 문제 생성하기</button>
+        <button onclick="toggleAnswers()" id="toggle-ans-btn" class="w-full bg-rose-50 border border-rose-200 text-${C} font-semibold py-2.5 px-4 rounded-xl hover:bg-rose-100 transition flex items-center justify-center gap-2"><i data-lucide="eye" id="eye-icon" class="w-4 h-4"></i> <span id="ans-text">답안 정답 보이기</span></button>
+      </div>`;
+}
+function readOptions(){
+  const g=id=>document.getElementById(id);
+  config.level=parseInt(g('difficulty').value)||GEN.defLevel;
+  config.progression=g('progression').value||'single';
+  GEN.checks.forEach(c=>{config.opt[c.id]=g('opt-'+c.id).checked;});
+  config.bigMode=g('opt-big').checked;config.boldKey=g('opt-boldkey').checked;
+  GEN.selects.forEach(s=>{const r=document.querySelector(`input[name="sel-${s.id}"]:checked`);config.sel[s.id]=r?r.value:s.def;});
+  config.typeWeights={};document.querySelectorAll('.type-weight').forEach(i=>config.typeWeights[i.dataset.type]=Math.max(1,Math.min(5,parseInt(i.value)||1)));
+  const st=[];if(g('style-subjective').checked)st.push('subjective');if(g('style-objective').checked)st.push('objective');if(g('style-narrative').checked)st.push('narrative');
+  config.styles=st.length?st:['subjective'];if(!st.length)g('style-subjective').checked=true;
+  const ty=[];document.querySelectorAll('.type-checkbox:checked').forEach(e=>ty.push(e.value));
+  config.types=ty.length?ty:[ALL_T[0]];if(!ty.length)document.querySelector('.type-checkbox').checked=true;
+}
+function toggleGroup(cb,gid){const g=document.getElementById(gid);if(g)g.querySelectorAll('.type-checkbox').forEach(x=>{x.checked=cb.checked;});regenerateSheet();}
+function syncGroupToggles(){document.querySelectorAll('.group-toggle').forEach(gt=>{const g=document.getElementById(gt.dataset.grp);if(!g)return;const items=[...g.querySelectorAll('.type-checkbox')];gt.checked=items.length>0&&items.every(x=>x.checked);});}
+function regenerateSheet(){
+  syncGroupToggles();readOptions();generatedPages=[];pageSeeds=[];
+  const base=((Date.now()^Math.floor(Math.random()*0x1000000))&0xFFFFFF)>>>0;
+  for(let p=0;p<config.pages;p++){const sd=(base+p*0x9E3779B1)>>>0;pageSeeds.push(sd);generatedPages.push(buildPageQuestions(sd,p));}
+  renderHTML();tryIcons();
+}
+
+// ───────── 학습지 HTML ─────────
+function renderChoices(q){
+  const maxLen=Math.max(...q.choices.map(x=>plain(x).length));
+  const long=maxLen>9;
+  const svgC=q.choices.some(x=>/<svg/.test(x));
+  const cols=svgC?'grid-cols-4':(maxLen>13?'grid-cols-1':'grid-cols-2');
+  return `<div class="mt-1.5"><div class="grid ${cols} gap-x-1 gap-y-0.5">${q.choices.map((ch,i)=>`<div class="${long?'text-[10px]':'text-[11px]'} text-slate-600 flex items-center gap-1"><span class="inline-block w-3.5 h-3.5 shrink-0 rounded-full border border-slate-300 text-[9px] text-center leading-3.5 font-bold">${i+1}</span><span class="${svgC?'':(maxLen>13?'flex-1 break-keep leading-tight':'flex-1 break-keep leading-tight')}">${ch}</span></div>`).join('')}</div><div class="mt-1 text-[9px] border-t border-slate-100 pt-0.5 text-slate-400">정답 기입: ( <span class="answer-box ${showAnswers?'visible text-red-500 font-bold text-xs':'invisible opacity-0'}">${q.correctIdx+1}</span> )</div></div>`;
+}
+// 카드 내용이 넘칠 때 자동으로 조금씩 줄여 맞춤(잘림 방지)
+function fitCards(){document.querySelectorAll('.print-area > div.grid > div').forEach(function(card){var inner=card.children[0];if(!inner)return;inner.style.zoom='';var z=1,g=0;while(card.scrollHeight-card.clientHeight>1&&z>0.5&&g++<14){z=Math.max(0.5,z-0.05);inner.style.zoom=z;}});}
+function renderHTML(){
+  const c=document.getElementById('print-pages-container');if(!c)return;c.innerHTML='';
+  const bg='bg-rose-600 text-white border-rose-600 font-bold',off='bg-slate-50 text-slate-400 border-slate-200 font-normal';
+  generatedPages.forEach((questions,pIdx)=>{
+    const page=document.createElement('div');
+    page.className="bg-white p-5 md:p-6 shadow-lg border border-slate-200 rounded-2xl print-area page-break max-w-[840px] mx-auto h-[1180px] overflow-hidden flex flex-col"+(config.bigMode?" big-mode":"")+(showAnswers?" show-ans":"");
+    const sBadges=ALL_S.map(s=>`<span class="${config.styles.includes(s)?bg:off} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${KOREAN_STYLES[s]}</span>`).join('');
+    const tBadges=ALL_T.map(t=>`<span class="${config.types.includes(t)?bg:off} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${TYPE[t].short||TYPE[t].label}</span>`);
+    const tRows=[];for(let i=0;i<tBadges.length;i+=6)tRows.push(`<div class="flex gap-1 flex-wrap">${tBadges.slice(i,i+6).join('')}</div>`);
+    const progLbl={single:'단일 (고정)',asc:'쉬움→어려움',desc:'어려움→쉬움',mix:'혼합 (무작위)'}[config.progression]||'단일 (고정)';
+    const L=GEN.levels[config.level-1]||GEN.levels[0];
+    const lvMain=(config.progression==='single')?`${L.s} · ${L.d}`:`${L.s}까지 (${progLbl})`;
+    const pageNum=(questions[0]&&questions[0].globalNum)?Math.floor((questions[0].globalNum-1)/config.questionsPerPage)+1:(pIdx+1);
+    const extra=(GEN.info?GEN.info():[]).map(x=>`<div>${x}</div>`).join('');
+    const qrBlock=`<div class="flex flex-col items-center gap-0.5 shrink-0"><div id="qr-${pIdx}" class="w-[100px] h-[100px] bg-white border border-slate-200 rounded p-1 flex items-center justify-center overflow-hidden"></div><span class="text-[8px] text-slate-500 font-bold leading-none">정답 QR (스캔)</span></div>`;
+    const header=`<div class="border-b-2 border-slate-800 pb-2 mb-2">
+      <div class="flex justify-between items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="bg-rose-600 text-white text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full">PAGE ${pageNum}</span>
+            <h1 class="text-xl font-extrabold tracking-tight text-slate-900">${GEN.title} 맞춤형 학습지</h1>
+            <span class="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded-full">made by 특수교사 슬옹쌤</span>
+          </div>
+          <div class="flex flex-col gap-1.5 mt-2.5 text-[10px] items-start">
+            <div class="flex flex-wrap items-center gap-1"><span class="font-extrabold text-slate-600 text-[9px] uppercase whitespace-nowrap">문항 방식:</span>${sBadges}</div>
+            <div class="flex items-start gap-1"><span class="font-extrabold text-slate-600 text-[9px] uppercase pt-0.5 whitespace-nowrap">세부 유형:</span><div class="flex flex-col gap-1">${tRows.join('')}</div></div>
+          </div>
+        </div>
+        <div class="flex items-start gap-2 shrink-0">
+          <div class="text-right text-[10px] text-slate-600 space-y-0.5 bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-medium max-w-[190px]">
+            <div>출력 일자: ${config.dateStr}</div><div>학습 단계: ${lvMain}</div>${extra}<div>총 문항수: ${config.questionsPerPage}문항</div>
+          </div>
+          ${qrBlock}
+        </div>
+      </div>
+    </div>`;
+    const cols=config.bigMode?2:3;const gridRows=Math.max(1,Math.ceil(config.questionsPerPage/cols));
+    const rowH=(930-(gridRows-1)*10)/gridRows;const vmax=Math.max(70,Math.floor(rowH-(config.bigMode?112:122)));
+    let grid=`<div class="grid gap-2.5 flex-1 min-h-0" style="--vmax:${vmax}px;grid-template-columns:repeat(${cols},minmax(0,1fr));grid-template-rows:repeat(${gridRows},minmax(0,1fr));">`;
+    questions.forEach(q=>{
+      let ans;
+      if(q.style==='objective'&&q.choices){ans=renderChoices(q);}
+      else{ans=`<div class="mt-1.5 border-b border-dashed border-slate-300 pb-0.5 flex items-baseline"><span class="text-[9px] text-slate-400 font-semibold mr-1 shrink-0 whitespace-nowrap">정답 :</span><span class="answer-box text-[11px] font-extrabold text-red-500 pl-0.5 ${showAnswers?'visible':'invisible opacity-0'}">${q.ans}</span></div>`;}
+      let qt=q.q;if(!config.boldKey)qt=qt.replace(/<\/?b>/g,'');
+      grid+=`<div class="flex flex-col justify-between border border-slate-200 p-2 rounded-xl bg-white relative overflow-hidden min-h-0 min-w-0">
+        <div class="min-h-0"><div class="flex justify-between items-center w-full mb-0.5"><span class="font-black text-rose-600 text-xs md:text-sm">${q.globalNum}.</span><span class="text-[7.5px] bg-slate-100 text-slate-500 border border-slate-200 px-1 rounded font-bold">${(GEN.levels[q.lv-1]||{s:''}).s}</span></div>
+        <p class="qtext-el text-[11.5px] md:text-xs font-medium text-slate-900 leading-normal">${qt}</p>${q.viz}</div>
+        <div>${ans}</div></div>`;
+    });
+    grid+=`</div>`;
+    const wm=`<div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[8px] text-slate-300"><span>ⓒ made by 특수교사 슬옹쌤 · ${GEN.title} 학습지 자동 생성</span><span>PAGE ${pageNum} / ${config.pages}</span></div>`;
+    page.innerHTML=header+grid+wm;c.appendChild(page);
+  });
+  try{fitCards();}catch(e){}
+  makeQRCodes();
+}
+
+// ───────── 컨트롤 ─────────
+function tryIcons(){try{if(typeof lucide!=='undefined'&&lucide.createIcons)lucide.createIcons();}catch(e){}}
+function initDate(){const t=new Date();config.dateStr=`${t.getFullYear()}년 ${String(t.getMonth()+1).padStart(2,'0')}월 ${String(t.getDate()).padStart(2,'0')}일`;}
+function setPagesDropdown(v){config.pages=parseInt(v);regenerateSheet();}
+function updateQuestionsCount(v){document.getElementById('num-of-questions-val').innerText=v+'개';config.questionsPerPage=parseInt(v);regenerateSheet();}
+function toggleAnswers(){
+  showAnswers=!showAnswers;const at=document.getElementById('ans-text'),ei=document.getElementById('eye-icon');
+  if(showAnswers){at.innerText='답안 정답 숨기기';ei.setAttribute('data-lucide','eye-off');}else{at.innerText='답안 정답 보이기';ei.setAttribute('data-lucide','eye');}
+  renderHTML();tryIcons();
+}
+function setupTypeWeights(){
+  document.querySelectorAll('.type-checkbox').forEach(cb=>{const label=cb.closest('label');if(!label||label.querySelector('.type-weight'))return;
+    const inp=document.createElement('input');inp.type='number';inp.min='1';inp.max='5';inp.value='1';
+    inp.className='type-weight ml-auto w-9 text-[10px] text-center border border-slate-200 rounded px-0.5 py-0.5';inp.dataset.type=cb.value;inp.title='출제 비중(1~5)';
+    inp.addEventListener('click',e=>e.stopPropagation());inp.addEventListener('input',()=>regenerateSheet());label.appendChild(inp);});
+}
+function printSheet(){try{if(window.self!==window.top){window.parent.focus();window.parent.print();return;}}catch(e){}try{window.focus();window.print();}catch(e){}}
+
+// ═════════════════════ 그래프 읽기 ═════════════════════
+const PAL=['#ef4444','#3b82f6','#f59e0b','#22c55e','#a855f7','#ec4899'];
+const THEMES=[
+  {title:'좋아하는 과일별 학생 수',nar:'우리 반 친구들이 좋아하는 과일을 조사했어요.',u:'명',cats:['사과','바나나','포도','딸기','귤','수박']},
+  {title:'좋아하는 동물별 학생 수',nar:'우리 반 친구들이 좋아하는 동물을 조사했어요.',u:'명',cats:['강아지','고양이','토끼','햄스터','거북이','앵무새']},
+  {title:'좋아하는 운동별 학생 수',nar:'우리 반 친구들이 좋아하는 운동을 조사했어요.',u:'명',cats:['축구','농구','피구','달리기','줄넘기','수영']},
+  {title:'좋아하는 계절별 학생 수',nar:'우리 반 친구들이 좋아하는 계절을 조사했어요.',u:'명',cats:['봄','여름','가을','겨울']},
+  {title:'좋아하는 색깔별 학생 수',nar:'우리 반 친구들이 좋아하는 색깔을 조사했어요.',u:'명',cats:['빨강','파랑','노랑','초록','보라','분홍']},
+  {title:'좋아하는 급식 메뉴별 학생 수',nar:'우리 반 친구들이 좋아하는 급식 메뉴를 조사했어요.',u:'명',cats:['불고기','비빔밥','돈가스','떡볶이','카레','볶음밥']},
+  {title:'좋아하는 과목별 학생 수',nar:'우리 반 친구들이 좋아하는 과목을 조사했어요.',u:'명',cats:['국어','수학','체육','음악','미술','과학']},
+  {title:'좋아하는 간식별 학생 수',nar:'우리 반 친구들이 좋아하는 간식을 조사했어요.',u:'명',cats:['과자','빵','젤리','과일','초콜릿','떡']},
+  {title:'등교 방법별 학생 수',nar:'우리 반 친구들이 학교에 오는 방법을 조사했어요.',u:'명',cats:['걸어서','버스','자전거','자동차','지하철']},
+  {title:'종류별 책의 수',nar:'학급 문고에 있는 책의 종류를 조사했어요.',u:'권',cats:['동화책','만화책','과학책','위인전','사전']},
+  {title:'과일 가게의 과일별 수',nar:'과일 가게에 있는 과일의 수를 세어 보았어요.',u:'개',cats:['사과','배','귤','감','포도']}];
+function pickTheme(people){const ts=THEMES.filter(t=>!people||t.u==='명').map(t=>Object.assign({},t));return pick(ts);}
+function mkData(lv,o){
+  const th=pickTheme();o=o||{};
+  let n=o.n||(lv<=2?randInt(3,4):randInt(4,5));
+  let cats=sample(th.cats,Math.min(n,th.cats.length));n=cats.length;
+  const step=o.step||1,kmax=o.kmax||9;
+  const half=!!o.half;
+  const pool=[];for(let k=(half?2:1);k<=(half?kmax*2:kmax);k++)pool.push(half?k*step/2:k*step);
+  const vals=sample(pool,n);
+  return {th,cats,vals,step,u:th.u,n};
+}
+function chk(d){return new Set(d.vals).size===d.vals.length;}
+function lv2opts(lv,kind){
+  // 막대/그림/표별 단계별 설정
+  if(kind==='table'){if(lv<=1)return {step:1,kmax:9};if(lv===2)return {step:1,kmax:10};if(lv===3)return {step:1,kmax:12};if(lv===4)return {step:5,kmax:10};if(lv===5)return {step:10,kmax:10};return {step:10,kmax:30};}
+  if(kind==='picto'){if(lv<=3)return {step:1,kmax:10,icon:1};if(lv===4)return {step:pick([5,10]),kmax:10};return {step:pick([5,10]),kmax:10};}
+  if(kind==='bar'){if(lv<=3)return {step:pick([1,2]),kmax:(lv<=3?5:5)};if(lv===4)return {step:pick([2,5,5,10]),kmax:8};if(lv===5)return {step:pick([5,10]),kmax:9};return {step:pick([10,20,50]),kmax:8,half:true};}
+  return {step:1,kmax:9};
+}
+function jwc(w,t){return w+josaW(w,t);}
+
+// ───── 그림 그리기 ─────
+function titleSvg(t,W){return Tx(W/2,13,t,{size:11.5,weight:800,fill:'#334155'});}
+function personIcon(x,y,s,color){return `<circle cx="${r2(x+s/2)}" cy="${r2(y+s*.22)}" r="${r2(s*.2)}" fill="${color}"/><path d="M${r2(x+s*.1)} ${r2(y+s)} Q${r2(x+s*.1)} ${r2(y+s*.5)} ${r2(x+s/2)} ${r2(y+s*.5)} Q${r2(x+s*.9)} ${r2(y+s*.5)} ${r2(x+s*.9)} ${r2(y+s)} Z" fill="${color}"/>`;}
+function tableSvg(d,title,compact){
+  const W=240,n=d.n,lw=54,cw=Math.min(44,(W-lw-12)/n),x0=(W-lw-cw*n)/2,y0=compact?22:24,rh=compact?25:30;let g=titleSvg(title,W);
+  g+=`<rect x="${x0}" y="${y0}" width="${lw}" height="${rh}" fill="#ffe4e6" stroke="#94a3b8"/>`+Tx(x0+lw/2,y0+rh*.64,'종류',{size:10.5,weight:800,fill:'#9f1239'});
+  g+=`<rect x="${x0}" y="${y0+rh}" width="${lw}" height="${rh}" fill="#ffe4e6" stroke="#94a3b8"/>`+Tx(x0+lw/2,y0+rh*1.64,`${d.th.u==='명'?'학생 수':d.th.u==='권'?'책의 수':'과일 수'}(${d.u})`,{size:9.2,weight:800,fill:'#9f1239'});
+  d.cats.forEach((c,i)=>{const x=x0+lw+i*cw;
+    g+=`<rect x="${r2(x)}" y="${y0}" width="${r2(cw)}" height="${rh}" fill="#fff" stroke="#94a3b8"/>`+Tx(r2(x+cw/2),y0+rh*.64,c,{size:c.length>3?9.5:11,weight:700});
+    g+=`<rect x="${r2(x)}" y="${y0+rh}" width="${r2(cw)}" height="${rh}" fill="#fff" stroke="#94a3b8"/>`+Tx(r2(x+cw/2),y0+rh*1.66,d.vals[i],{size:14,weight:800,fill:'#0f172a'});});
+  return svgWrap(W,y0+2*rh+6,g);
+}
+function pictoSvg(d,title,unit){
+  const W=240,n=d.n,rh=24,y0=22,lw=52,s=15;let g=titleSvg(title,W);
+  d.cats.forEach((c,i)=>{const y=y0+i*rh;
+    g+=`<line x1="6" y1="${y+rh}" x2="${W-6}" y2="${y+rh}" stroke="#e2e8f0"/>`+Tx(6+lw-4,y+rh/2+4,c,{size:c.length>3?9.5:11,weight:700,anchor:'end'});
+    const k=d.vals[i]/unit;for(let j=0;j<k;j++)g+=personIcon(6+lw+4+j*(s+1.5),y+(rh-s)/2,s,PAL[i%PAL.length]);});
+  const yl=y0+n*rh+6;
+  g+=personIcon(W/2-40,yl,15,'#64748b')+Tx(W/2-20,yl+12,`= ${unit}${d.u}`,{size:11.5,weight:800,anchor:'start',fill:'#475569'});
+  return svgWrap(W,yl+22,g);
+}
+function barSvg(d,title,o){
+  o=o||{};const W=240,H=o.H||186,n=d.n;let g=titleSvg(title,W);
+  const maxv=Math.max(...d.vals),step=d.step;let axis=Math.ceil((maxv+0.0001)/step)*step;if(axis<maxv+0)axis+=step;
+  const tickEvery=(axis/step>10)?2:1;
+  if(o.horiz){
+    const L=48,R=228,T=26,B=H-22,slot=(B-T)/n;const sc=v=>L+(R-L)*v/axis;
+    for(let t=0;t<=axis+1e-9;t+=step*tickEvery){const x=sc(t);g+=`<line x1="${r2(x)}" y1="${T}" x2="${r2(x)}" y2="${B}" stroke="#e2e8f0"/>`+Tx(r2(x),B+12,t,{size:9,fill:'#64748b'});}
+    g+=`<line x1="${L}" y1="${T-2}" x2="${L}" y2="${B}" stroke="#334155" stroke-width="1.5"/><line x1="${L}" y1="${B}" x2="${R+4}" y2="${B}" stroke="#334155" stroke-width="1.5"/>`+Tx(R+2,B+22,`(${d.u})`,{size:8.5,fill:'#64748b',anchor:'end'});
+    d.cats.forEach((c,i)=>{const y=T+i*slot+slot*.18,h=slot*.64;const bar=`<rect x="${L}" y="${r2(y)}" width="${r2(sc(d.vals[i])-L)}" height="${r2(h)}" fill="${PAL[i%PAL.length]}" rx="1.5"/>`;
+      g+=Tx(L-4,r2(y+h/2+3.5),c,{size:c.length>3?9:10,anchor:'end',weight:700})+(o.ansBars?ansG(bar):bar)+(o.showVal&&!o.ansBars?Tx(r2(sc(d.vals[i])+3),r2(y+h/2+3.5),d.vals[i],{size:9,anchor:'start',weight:700}):'');});
+  } else {
+    const L=34,R=232,T=28,B=H-26,slot=(R-L)/n;const sc=v=>B-(B-T)*v/axis;
+    for(let t=0;t<=axis+1e-9;t+=step*tickEvery){const y=sc(t);g+=`<line x1="${L}" y1="${r2(y)}" x2="${R}" y2="${r2(y)}" stroke="#e2e8f0"/>`+Tx(L-4,r2(y+3.3),t,{size:9,fill:'#64748b',anchor:'end'});}
+    for(let t=0;t<=axis+1e-9;t+=step){if(tickEvery===2&&Math.round(t/step)%2){const y=sc(t);g+=`<line x1="${L}" y1="${r2(y)}" x2="${L+3}" y2="${r2(y)}" stroke="#94a3b8"/>`;}}
+    g+=`<line x1="${L}" y1="${T-4}" x2="${L}" y2="${B}" stroke="#334155" stroke-width="1.5"/><line x1="${L}" y1="${B}" x2="${R+4}" y2="${B}" stroke="#334155" stroke-width="1.5"/>`+Tx(L-4,T-8,`(${d.u})`,{size:8.5,fill:'#64748b',anchor:'end'});
+    d.cats.forEach((c,i)=>{const bw=slot*.54,x=L+i*slot+(slot-bw)/2,yy=sc(d.vals[i]);const bar=`<rect x="${r2(x)}" y="${r2(yy)}" width="${r2(bw)}" height="${r2(B-yy)}" fill="${PAL[i%PAL.length]}" rx="1.5"/>`;
+      g+=(o.ansBars?ansG(bar):bar)+Tx(r2(x+bw/2),B+13,c,{size:c.length>3?8.6:9.8,weight:700})+(o.showVal&&!o.ansBars?Tx(r2(x+bw/2),r2(yy-3),d.vals[i],{size:9,weight:700}):'');});
+  }
+  return svgWrap(W,H,g);
+}
+function lineSvg2(d,title){
+  const W=240,H=190,L=36,R=230,T=30,B=H-28,n=d.xs.length;let g=titleSvg(title,W);
+  const step=d.step,axis=Math.ceil(Math.max(...d.ys)/step)*step,min0=Math.max(0,Math.floor((Math.min(...d.ys)-step)/step)*step);const sc=v=>B-(B-T)*(v-min0)/(axis-min0),xs=i=>L+8+(R-L-16)*i/(n-1);
+  for(let t=min0;t<=axis+1e-9;t+=step){const y=sc(t);g+=`<line x1="${L}" y1="${r2(y)}" x2="${R}" y2="${r2(y)}" stroke="#e2e8f0"/>`+Tx(L-4,r2(y+3.3),t,{size:9,fill:'#64748b',anchor:'end'});}
+  g+=`<line x1="${L}" y1="${T-4}" x2="${L}" y2="${B}" stroke="#334155" stroke-width="1.5"/><line x1="${L}" y1="${B}" x2="${R+4}" y2="${B}" stroke="#334155" stroke-width="1.5"/>`+Tx(L-4,T-8,`(${d.yu})`,{size:8.5,fill:'#64748b',anchor:'end'});
+  if(min0>0)g+=`<path d="M${L-5} ${B-16} l10 -3 l-10 -3 l10 -3" fill="none" stroke="#334155" stroke-width="1.4"/>`;
+  g+=`<polyline points="${d.ys.map((v,i)=>r2(xs(i))+','+r2(sc(v))).join(' ')}" fill="none" stroke="#e11d48" stroke-width="2"/>`;
+  d.ys.forEach((v,i)=>{g+=`<circle cx="${r2(xs(i))}" cy="${r2(sc(v))}" r="3.4" fill="#e11d48" stroke="#fff" stroke-width="1"/>`+Tx(r2(xs(i)),B+13,d.xs[i],{size:9.3,weight:700});});
+  g+=Tx(R+2,B+25,`(${d.xu})`,{size:8.5,fill:'#64748b',anchor:'end'});
+  return svgWrap(W,H,g);
+}
+function dbarSvg(d,title){
+  const W=240,H=196,L=34,R=232,T=40,B=H-26,n=d.n,slot=(R-L)/n;let g=titleSvg(title,W);
+  const step=d.step,axis=Math.ceil(Math.max(...d.v1,...d.v2)/step)*step,sc=v=>B-(B-T)*v/axis;
+  g+=`<rect x="${W/2-50}" y="19" width="9" height="9" fill="${PAL[1]}"/>`+Tx(W/2-38,27,d.s1,{size:9.5,anchor:'start',weight:700})+`<rect x="${W/2+10}" y="19" width="9" height="9" fill="${PAL[0]}"/>`+Tx(W/2+22,27,d.s2,{size:9.5,anchor:'start',weight:700});
+  const tickEvery=(axis/step>10)?2:1;
+  for(let t=0;t<=axis+1e-9;t+=step*tickEvery){const y=sc(t);g+=`<line x1="${L}" y1="${r2(y)}" x2="${R}" y2="${r2(y)}" stroke="#e2e8f0"/>`+Tx(L-4,r2(y+3.3),t,{size:9,fill:'#64748b',anchor:'end'});}
+  g+=`<line x1="${L}" y1="${T-4}" x2="${L}" y2="${B}" stroke="#334155" stroke-width="1.5"/><line x1="${L}" y1="${B}" x2="${R+4}" y2="${B}" stroke="#334155" stroke-width="1.5"/>`+Tx(L-4,T-8,`(${d.u})`,{size:8.5,fill:'#64748b',anchor:'end'});
+  d.cats.forEach((c,i)=>{const bw=slot*.34,x=L+i*slot+slot*.1;
+    [[d.v1[i],PAL[1],0],[d.v2[i],PAL[0],1]].forEach(([v,col,k])=>{const yy=sc(v);g+=`<rect x="${r2(x+k*bw)}" y="${r2(yy)}" width="${r2(bw)}" height="${r2(B-yy)}" fill="${col}"/>`;});
+    g+=Tx(r2(L+i*slot+slot/2),B+13,c,{size:c.length>3?8.6:9.8,weight:700});});
+  return svgWrap(W,H,g);
+}
+function pieSvg(d,title){
+  const W=240,H=184,cx=70,cy=102,R=58;let g=titleSvg(title,W),a=-Math.PI/2;
+  d.cats.forEach((c,i)=>{const p=d.vals[i]/100,a2=a+p*2*Math.PI;const x1=cx+R*Math.cos(a),y1=cy+R*Math.sin(a),x2=cx+R*Math.cos(a2),y2=cy+R*Math.sin(a2);
+    g+=`<path d="M${cx} ${cy} L${r2(x1)} ${r2(y1)} A${R} ${R} 0 ${p>.5?1:0} 1 ${r2(x2)} ${r2(y2)} Z" fill="${PAL[i%PAL.length]}" stroke="#fff" stroke-width="1.5"/>`;
+    if(p>=.1){const am=(a+a2)/2;g+=Tx(r2(cx+R*.62*Math.cos(am)),r2(cy+R*.62*Math.sin(am)+3.5),d.vals[i]+'%',{size:10,fill:'#fff',weight:800});}
+    a=a2;});
+  d.cats.forEach((c,i)=>{const y=52+i*20;g+=`<rect x="146" y="${y}" width="11" height="11" fill="${PAL[i%PAL.length]}"/>`+Tx(162,y+10,`${c} ${d.vals[i]}%`,{size:10.5,anchor:'start',weight:700});});
+  return svgWrap(W,H,g);
+}
+function bandSvg(d,title){
+  const W=240,H=118,x0=10,w=220,y=34,h=34;let g=titleSvg(title,W),x=x0;
+  d.cats.forEach((c,i)=>{const sw=w*d.vals[i]/100;g+=`<rect x="${r2(x)}" y="${y}" width="${r2(sw)}" height="${h}" fill="${PAL[i%PAL.length]}" stroke="#fff" stroke-width="1.5"/>`;
+    if(d.vals[i]>=10)g+=Tx(r2(x+sw/2),y+h/2+4,d.vals[i]+'%',{size:10,fill:'#fff',weight:800});x+=sw;});
+  g+=`<g>`+[0,25,50,75,100].map(t=>`<line x1="${x0+w*t/100}" y1="${y+h}" x2="${x0+w*t/100}" y2="${y+h+4}" stroke="#64748b"/>`+Tx(x0+w*t/100,y+h+14,t+'%',{size:8,fill:'#64748b',anchor:t===0?'start':t===100?'end':'middle'})).join('')+`</g>`;
+  const per=3;d.cats.forEach((c,i)=>{const col=i%per,row=Math.floor(i/per),lx=12+col*76,ly=y+h+26+row*16;g+=`<rect x="${lx}" y="${ly}" width="9" height="9" fill="${PAL[i%PAL.length]}"/>`+Tx(lx+13,ly+9,`${c}`,{size:9.5,anchor:'start',weight:700});});
+  return svgWrap(W,H+(d.cats.length>3?10:0),g);
+}
+
+// ───── 질문 만들기 ─────
+function numDis(v,st,u){return [v+st,v-st,v+2*st,v-2*st,v+Math.max(1,Math.round(st/2)),v+3*st].filter(x=>x>0&&x!==v).map(x=>x+u);}
+function askData(d,lv,kinds,nar,n,o){
+  o=o||{};const u=d.u,vals=d.vals,cats=d.cats,idx=cats.map((_,i)=>i);
+  const kind=pick(kinds);
+  const mxI=vals.indexOf(Math.max(...vals)),mnI=vals.indexOf(Math.min(...vals));
+  const pre=nar?`${nm(n,'i')} ${d.th.nar} `:'';
+  const st=d.step;
+  switch(kind){
+    case 'val':{const i=pick(idx);return {q:`${pre}<b>${cats[i]}</b>${josaW(cats[i],'eun')} 몇 ${u}일까요?`,ans:vals[i]+u,distract:numDis(vals[i],st,u)};}
+    case 'most':return {q:`${pre}가장 <b>많은</b> 것은 무엇일까요?`,ans:cats[mxI],distract:cats.filter((_,i)=>i!==mxI).concat(['모두 같다'])};
+    case 'least':return {q:`${pre}가장 <b>적은</b> 것은 무엇일까요?`,ans:cats[mnI],distract:cats.filter((_,i)=>i!==mnI).concat(['모두 같다'])};
+    case 'mostN':{const i=mxI;return {q:`${pre}가장 많은 것은 몇 ${u}일까요?`,ans:vals[i]+u,distract:numDis(vals[i],st,u)};}
+    case 'sum':{const t=sum(vals);return {q:`${pre}모두 몇 ${u}일까요?`,ans:t+u,distract:[t+st,t-st,t+2*st,t-2*st,t+10,t-10].filter(x=>x>0&&x!==t).map(x=>x+u)};}
+    case 'diff':{let a=pick(idx),b=pick(idx);let t=0;while((a===b||vals[a]<=vals[b])&&t<30){a=pick(idx);b=pick(idx);t++;}if(a===b||vals[a]<=vals[b])return null;const df=vals[a]-vals[b];return {q:`${pre}<b>${cats[a]}</b>${josaW(cats[a],'eun')} <b>${cats[b]}</b>보다 몇 ${u} 더 많을까요?`,ans:df+u,distract:[df+st,Math.max(1,df-st),df+2*st,vals[a]+vals[b],df*2].filter(x=>x>0&&x!==df).map(x=>x+u)};}
+    case 'cmp':{let a=pick(idx),b=pick(idx);while(a===b)b=pick(idx);const big=vals[a]>vals[b]?a:b;return {q:`${pre}<b>${cats[a]}</b>${josaW(cats[a],'wa')} <b>${cats[b]}</b> 중 더 많은 것은 무엇일까요?`,ans:cats[big],distract:cats.filter((_,i)=>i!==big).concat(['같다'])};}
+    case 'rank':{const ord=idx.slice().sort((a,b)=>vals[b]-vals[a]).slice(0,3);const ans=ord.map(i=>cats[i]).join(', ');
+      const perms=[];for(let t=0;t<14&&perms.length<5;t++){const p=shuffle(idx).slice(0,3).map(i=>cats[i]).join(', ');if(p!==ans&&!perms.includes(p))perms.push(p);}
+      return {q:`${pre}<b>많은 것부터</b> 차례로 3가지를 쓰세요.`,ans,distract:perms};}
+    case 'order2':{const ord=idx.slice().sort((a,b)=>vals[a]-vals[b]).slice(0,3);const ans=ord.map(i=>cats[i]).join(', ');
+      const perms=[];for(let t=0;t<14&&perms.length<5;t++){const p=shuffle(idx).slice(0,3).map(i=>cats[i]).join(', ');if(p!==ans&&!perms.includes(p))perms.push(p);}
+      return {q:`${pre}<b>적은 것부터</b> 차례로 3가지를 쓰세요.`,ans,distract:perms};}
+    case 'scale':{return {q:`${pre}그래프에서 눈금 <b>한 칸</b>은 몇 ${u}을 나타낼까요?`.replace(`${u}을`,u+josaW(u,'eul')),ans:st+u,distract:[st*2+u,Math.max(1,Math.floor(st/2))+u,st*5+u,st+1+u,st*10+u]};}
+    case 'eq':{return null;}
+  }
+  return null;
+}
+function qKinds(lv,type){
+  if(lv<=1)return ['val','val','most','least','cmp'];
+  if(lv===2)return ['val','val','most','least','sum','cmp','diff'];
+  return ['val','most','least','sum','diff','cmp','rank','order2'];
+}
+
+const GEN={
+  id:'graph',title:'그래프 읽기',
+  levelTitle:'그래프 읽기 난이도 세부 설정',optNote:'(그래프 표시 방식)',
+  levels:[
+    {s:'1단계',d:'분류하여 세기·표 읽기'},
+    {s:'2단계',d:'그림그래프 (1칸 = 1)'},
+    {s:'3단계',d:'막대그래프 (눈금 1·2)'},
+    {s:'4단계',d:'눈금 5·10, 그림그래프 5·10, 막대 그리기'},
+    {s:'5단계',d:'가로 막대·꺾은선그래프'},
+    {s:'6단계',d:'두 자료 막대그래프·큰 수'},
+    {s:'7단계',d:'띠그래프·원그래프 (백분율)'}],
+  defLevel:3,
+  checks:[
+    {id:'showVal',label:'막대 위에 <b>값(수치)</b> 표시 (쉬운 버전)',def:false}],
+  selects:[],
+  groups:[
+    {id:'basic',label:'분류하고 표·그림그래프 읽기',types:[
+      {key:'countSort',label:'분류하여 세어 보기 (모양 세기)',short:'분류하여 세기',minLv:1,maxLv:2},
+      {key:'tableRead',label:'표 읽기',short:'표 읽기',minLv:1},
+      {key:'pictoRead',label:'그림그래프 읽기',short:'그림그래프',minLv:2}]},
+    {id:'bar',label:'막대·꺾은선그래프',types:[
+      {key:'barRead',label:'막대그래프 읽기 (세로·가로)',short:'막대그래프',minLv:3},
+      {key:'drawBar',label:'표를 보고 막대그래프 그리기',short:'막대 그리기',minLv:4,styles:['subjective','narrative']},
+      {key:'lineRead',label:'꺾은선그래프 읽기',short:'꺾은선그래프',minLv:5},
+      {key:'doubleBar',label:'두 자료 막대그래프 비교',short:'두 자료 비교',minLv:6}]},
+    {id:'ratio',label:'띠·원그래프',types:[
+      {key:'pieRead',label:'원그래프 읽기 (백분율)',short:'원그래프',minLv:7},
+      {key:'bandRead',label:'띠그래프 읽기 (백분율)',short:'띠그래프',minLv:7}]}],
+  info(){return [];},
+  build(type,style,lv){
+    const nar=style==='narrative',n=pickName();
+    const fin=(q,viz,r)=>r?({q:q.replace(/^/,''),viz,ans:r.ans,distract:r.distract}):null;
+    switch(type){
+      case 'countSort':{
+        const W=240,K=lv<=1?3:4;const sh=sample([0,1,2,3],K);const counts=sample([1,2,3,4,5,6,7,8],K);
+        const col=['#ef4444','#3b82f6','#facc15','#22c55e'];const pts=[];
+        counts.forEach((c,k)=>{for(let i=0;i<c;i++)pts.push([sh[k],k]);});
+        const P=shuffle(pts);const cols=Math.ceil(Math.sqrt(P.length*2.2)),rows=Math.ceil(P.length/cols);
+        const cw=Math.min(30,(W-16)/cols),chh=Math.min(28,128/rows);let g='';
+        P.forEach((p,i)=>{const cx=8+(i%cols)*cw+cw/2,cy=8+Math.floor(i/cols)*chh+chh/2;g+=shapeSvg2(p[0],col[p[1]],cx,cy,Math.min(cw,chh)*.36);});
+        const k=randInt(0,K-1);const name=['동그라미','네모','세모','별'][sh[k]];
+        const q=nar?`${nm(n,'i')} 여러 가지 모양을 늘어놓았어요. <b>${name}</b>${josaW(name,'eun')} 모두 몇 개일까요?`:`<b>${name}</b>${josaW(name,'eun')} 모두 몇 개일까요?`;
+        const v=counts[k];
+        return {q,viz:svgWrap(W,rows*chh+16,g),ans:v+'개',distract:[v+1,v-1,v+2,v-2,sum(counts)].filter(x=>x>0&&x!==v).map(x=>x+'개')};
+      }
+      case 'tableRead':{
+        let d,t=0;do{d=mkData(lv,lv2opts(lv,'table'));t++;}while(!chk(d)&&t<20);
+        const r=askData(d,lv,qKinds(lv),nar,n);if(!r)return null;
+        return {q:r.q,viz:tableSvg(d,d.th.title),ans:r.ans,distract:r.distract};
+      }
+      case 'pictoRead':{
+        const o=lv2opts(Math.max(2,lv),'picto');let d,t=0;do{d=mkData(lv,Object.assign({},o,{n:randInt(3,Math.min(5,lv<=3?4:5))}));t++;}while(!chk(d)&&t<20);
+        const unit=o.icon||o.step;
+        const r=askData(d,lv,qKinds(lv),nar,n);if(!r)return null;
+        return {q:r.q,viz:pictoSvg(d,d.th.title,unit),ans:r.ans,distract:r.distract};
+      }
+      case 'barRead':{
+        const o=lv2opts(Math.max(3,lv),'bar');let d,t=0;do{d=mkData(lv,Object.assign({},o,{n:randInt(3,lv>=5?5:4)}));t++;}while(!chk(d)&&t<20);
+        const horiz=lv>=5&&chance(.5);
+        const kinds=qKinds(lv).concat(lv>=4?['scale']:[]);
+        const r=askData(d,lv,kinds,nar,n);if(!r)return null;
+        return {q:r.q,viz:barSvg(d,d.th.title,{horiz,showVal:O().showVal}),ans:r.ans,distract:r.distract};
+      }
+      case 'drawBar':{
+        const o=lv2opts(Math.max(4,lv),'bar');o.step=pick([2,5]);o.kmax=pick([5,6]);let d,t=0;do{d=mkData(lv,Object.assign({},o,{n:randInt(3,4)}));t++;}while(!chk(d)&&t<20);
+        const horiz=false;
+        const q=nar?`${nm(n,'i')} ${d.th.nar} 표를 보고 <b>막대그래프</b>를 완성하세요.`:`표를 보고 <b>막대그래프</b>를 완성하세요.`;
+        const W=240;
+        const inner=(s)=>s.replace(/^<svg[^>]*>/,'').replace(/<\/svg>$/,'');
+        const tb=tableSvg(d,d.th.title,true),bar=barSvg(d,'',{ansBars:true,H:150}),th=22+50+6;
+        const viz=svgWrap(W,th+150,inner(tb)+`<g transform="translate(0 ${th})">${inner(bar)}</g>`);
+        return {q,viz,ans:d.cats.map((c,i)=>`${c} ${d.vals[i]}${d.u}`).join(', '),distract:[]};
+      }
+      case 'lineRead':{
+        const themes=[{t:'교실의 온도 변화',xu:'시각',xs:['9시','10시','11시','12시','1시','2시'],y:'℃',lo:16,hi:30,st:2},{t:'식물의 키 변화',xu:'요일',xs:['월','화','수','목','금'],y:'cm',lo:2,hi:20,st:2},{t:'월별 기온',xu:'월',xs:['3월','4월','5월','6월','7월'],y:'℃',lo:6,hi:30,st:5},{t:'나의 몸무게 변화',xu:'월',xs:['1월','2월','3월','4월','5월'],y:'kg',lo:30,hi:40,st:2}];
+        const th=pick(themes);const nx=th.xs.length;const st=th.st;
+        let ys,tt=0;do{ys=[];let v=randInt(Math.ceil(th.lo/st),Math.floor((th.lo+th.hi)/2/st))*st;for(let i=0;i<nx;i++){ys.push(v);v+=pick([-2,-1,0,1,1,2,2,3])*st;v=Math.max(th.lo,Math.min(th.hi,v));}tt++;}while(new Set(ys).size<3&&tt<30);
+        const d={xs:th.xs,ys,step:st,yu:th.y,xu:th.xu};
+        const kinds=['val','val','max','min','diff'];const kind=pick(kinds);
+        const pre=nar?`${nm(n,'i')} ${th.t}${josaW(th.t,'eul')} 꺾은선그래프로 나타냈어요. `:'';
+        let q,ans,dis;
+        if(kind==='val'){const i=randInt(0,nx-1);q=`${pre}<b>${th.xs[i]}</b>의 값은 얼마일까요?`;ans=ys[i]+th.y;dis=[ys[i]+st,ys[i]-st,ys[i]+2*st,ys[i]-2*st,ys[i]+1].filter(x=>x>0&&x!==ys[i]).map(x=>x+th.y);}
+        else if(kind==='max'||kind==='min'){const m=kind==='max'?Math.max(...ys):Math.min(...ys);const hits=ys.filter(v=>v===m).length;if(hits>1)return null;const i=ys.indexOf(m);q=`${pre}값이 가장 <b>${kind==='max'?'높은':'낮은'}</b> 때는 언제일까요?`;ans=th.xs[i];dis=th.xs.filter((_,j)=>j!==i);if(dis.length<3)return null;}
+        else{const i=randInt(1,nx-1);const df=ys[i]-ys[i-1];if(df===0)return null;q=`${pre}<b>${th.xs[i-1]}</b>${josaW(th.xs[i-1],'eun')} <b>${th.xs[i]}</b> 사이에 값이 ${df>0?'몇 늘어났을까요?':'몇 줄어들었을까요?'}`;ans=Math.abs(df)+th.y;dis=[Math.abs(df)+st,Math.max(1,Math.abs(df)-st),Math.abs(df)*2,ys[i],ys[i-1]].filter(x=>x>0&&x!==Math.abs(df)).map(x=>x+th.y);}
+        return {q,viz:lineSvg2(d,th.t),ans,distract:dis};
+      }
+      case 'doubleBar':{
+        const o={step:pick([10,20,50]),kmax:8,half:false};const th=pickTheme(true);
+        const nC=randInt(3,4);const cats=sample(th.cats,Math.min(nC,th.cats.length));
+        const pool=[];for(let k=1;k<=8;k++)pool.push(k*o.step);
+        const v1=cats.map(()=>pick(pool)),v2=cats.map(()=>pick(pool));
+        const s1=pick(['남학생','1반']),s2=s1==='남학생'?'여학생':'2반';
+        const d={cats,n:cats.length,v1,v2,s1,s2,step:o.step,u:'명',th};
+        const kind=pick(['val','diff','more','sum']);const i=randInt(0,cats.length-1);
+        let q,ans,dis;const pre=nar?`${nm(n,'i')} 두 집단의 ${th.title.replace('별 학생 수','')}${josaW(th.title.replace('별 학생 수',''),'eul')} 조사했어요. `:'';
+        const who=pick([[s1,v1],[s2,v2]]);
+        if(kind==='val'){q=`${pre}<b>${who[0]}</b>의 <b>${cats[i]}</b>${josaW(cats[i],'eun')} 몇 명일까요?`;const v=who[1][i];ans=v+'명';dis=[v+o.step,v-o.step,v+2*o.step,v-2*o.step,v+o.step/2].filter(x=>x>0&&x!==v).map(x=>x+'명');}
+        else if(kind==='diff'){const df=Math.abs(v1[i]-v2[i]);if(df===0)return null;q=`${pre}<b>${cats[i]}</b>의 학생 수는 <b>${s1}</b>과 <b>${s2}</b>이 몇 명 차이일까요?`;ans=df+'명';dis=[df+o.step,Math.max(1,df-o.step),df*2,v1[i]+v2[i],df+2*o.step].filter(x=>x>0&&x!==df).map(x=>x+'명');}
+        else if(kind==='more'){const diffs=cats.map((c,j)=>v1[j]-v2[j]);const cand=cats.map((c,j)=>j).filter(j=>diffs[j]>0);if(!cand.length||cand.length===cats.length)return null;
+          const mx=cand.filter(j=>diffs[j]===Math.max(...cand.map(x=>diffs[x])));if(mx.length!==1)return null;q=`${pre}<b>${s1}</b>이 <b>${s2}</b>보다 더 많은 것 중 차이가 가장 큰 것은 무엇일까요?`;ans=cats[mx[0]];dis=cats.filter((c,j)=>j!==mx[0]).concat(['없다']);if(dis.length<3)return null;}
+        else{q=`${pre}<b>${cats[i]}</b>의 학생 수는 <b>${s1}</b>과 <b>${s2}</b>${josaW(s2,'eul')} 합하여 모두 몇 명일까요?`;const t=v1[i]+v2[i];ans=t+'명';dis=[t+o.step,t-o.step,Math.abs(v1[i]-v2[i]),t+2*o.step,t+10].filter(x=>x>0&&x!==t).map(x=>x+'명');}
+        return {q,viz:dbarSvg(d,th.title.replace('학생 수','학생 수 비교')),ans,distract:dis};
+      }
+      case 'pieRead':
+      case 'bandRead':{
+        const th=pickTheme(true);const K=randInt(3,5);const cats=sample(th.cats,Math.min(K,th.cats.length));
+        let vals,t=0;do{const base=[5,10,15,20,25,30,35,40,45,50];const parts=[];let left=100;for(let i=0;i<cats.length-1;i++){const mx=left-5*(cats.length-1-i);const c=base.filter(b=>b<=mx&&b<=60);const v=pick(c);parts.push(v);left-=v;}parts.push(left);vals=parts;t++;}while((vals.some(v=>v<5)||new Set(vals).size<vals.length)&&t<60);
+        if(new Set(vals).size<vals.length)return null;
+        const d={cats,vals,th};const kind=pick(['big','small','pct','num','pct2']);
+        const pre=nar?`${nm(n,'i')} ${th.nar} `:'';let q,ans,dis;
+        const mx=vals.indexOf(Math.max(...vals)),mn=vals.indexOf(Math.min(...vals));
+        if(kind==='big'){q=`${pre}비율이 가장 <b>큰</b> 것은 무엇일까요?`;ans=cats[mx];dis=cats.filter((_,i)=>i!==mx);if(dis.length<3)dis.push('모두 같다');}
+        else if(kind==='small'){q=`${pre}비율이 가장 <b>작은</b> 것은 무엇일까요?`;ans=cats[mn];dis=cats.filter((_,i)=>i!==mn);if(dis.length<3)dis.push('모두 같다');}
+        else if(kind==='pct'){const i=randInt(0,cats.length-1);q=`${pre}<b>${cats[i]}</b>${josaW(cats[i],'eun')} 전체의 몇 %일까요? (그래프에서 찾아 쓰세요)`;ans=vals[i]+'%';dis=[vals[i]+5,vals[i]-5,vals[i]+10,vals[i]-10,vals[i]*2].filter(x=>x>0&&x<100&&x!==vals[i]).map(x=>x+'%');}
+        else if(kind==='num'){const T=pick([20,40,50,100,200]);const i=randInt(0,cats.length-1);const v=T*vals[i]/100;if(!Number.isInteger(v))return null;q=`${pre}전체 학생이 <b>${T}명</b>이라면 <b>${cats[i]}</b>${josaW(cats[i],'eun')} 몇 명일까요?`;ans=v+'명';dis=[v+T/20,v-T/20,v*2,T-v,v+T/10].filter(x=>x>0&&x!==v&&Number.isInteger(x)).map(x=>x+'명');}
+        else{let a=randInt(0,cats.length-1),b=randInt(0,cats.length-1);while(a===b)b=randInt(0,cats.length-1);q=`${pre}<b>${cats[a]}</b>${josaW(cats[a],'wa')} <b>${cats[b]}</b>${josaW(cats[b],'eul')} 합하면 전체의 몇 %일까요?`;const s=vals[a]+vals[b];ans=s+'%';dis=[s+5,s-5,s+10,s-10,Math.abs(vals[a]-vals[b])].filter(x=>x>0&&x<=100&&x!==s).map(x=>x+'%');}
+        const title=th.title.replace('학생 수','학생 수의 비율').replace('책의 수','책의 비율').replace('과일별 수','과일의 비율');
+        return {q,viz:type==='pieRead'?pieSvg(d,title):bandSvg(d,title),ans,distract:dis};
+      }
+    }
+    return null;
+  }
+};
+function shapeSvg2(sh,fill,cx,cy,r){
+  const st=`fill="${fill}" stroke="#334155" stroke-width="1.2" stroke-linejoin="round"`;
+  if(sh===0)return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r)}" ${st}/>`;
+  if(sh===1)return `<rect x="${r2(cx-r*.9)}" y="${r2(cy-r*.9)}" width="${r2(r*1.8)}" height="${r2(r*1.8)}" rx="1.5" ${st}/>`;
+  if(sh===2)return `<polygon points="${r2(cx)},${r2(cy-r)} ${r2(cx+r)},${r2(cy+r*.8)} ${r2(cx-r)},${r2(cy+r*.8)}" ${st}/>`;
+  let p=[];for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r*.45:r*1.05;p.push(r2(cx+rr*Math.cos(a))+','+r2(cy+rr*Math.sin(a)));}return `<polygon points="${p.join(' ')}" ${st}/>`;
+}
+
+// ───────── 시작 ─────────
+window.regenerateSheet=regenerateSheet;window.toggleAnswers=toggleAnswers;window.printSheet=printSheet;
+window.setPagesDropdown=setPagesDropdown;window.updateQuestionsCount=updateQuestionsCount;window.toggleGroup=toggleGroup;
+function initApp(){initConfig();buildPanel();initDate();if(tryAnswerView())return;setupTypeWeights();regenerateSheet();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initApp);else initApp();
+
+  </script>
+</body>
+</html>

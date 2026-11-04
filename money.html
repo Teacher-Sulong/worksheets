@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>[수학] 돈세기 맞춤형 학습지 생성기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+    body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; }
+    @media print {
+      html, body { background-color: #fff !important; height: auto !important; min-height: auto !important; overflow: visible !important; }
+      .no-print { display: none !important; }
+      main { display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
+      #print-pages-container { display: block !important; width: 100% !important; }
+      .print-area {
+        width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 6mm !important;
+        box-sizing: border-box !important; box-shadow: none !important; border: none !important;
+        page-break-after: always !important; break-after: page !important; page-break-inside: avoid !important;
+        height: 285mm !important; overflow: hidden !important;
+      }
+      .print-area:last-child { page-break-after: auto !important; break-after: auto !important; }
+      @page { size: A4; margin: 6mm; }
+    }
+    body.answer-view #main-header, body.answer-view #option-panel,
+    body.answer-view #print-control-toolbar, body.answer-view footer { display: none !important; }
+    body.answer-view main { display: block; padding: 10px; max-width: 900px; margin: 0 auto; }
+    body.answer-view .print-area { box-shadow: none; border-color: #e2e8f0; }
+    .print-area.big-mode .qtext-el { font-size: 14.5px !important; line-height: 1.55 !important; }
+    .print-area.big-mode .answer-box { font-size: 14px !important; }
+    /* 그림(SVG) 영역 */
+    .viz { display: block; margin: 2px auto; width: 100%; height: auto; max-height: var(--vmax, 190px); }
+    .ansonly { visibility: hidden; }
+    .show-ans .ansonly { visibility: visible; }
+    .choice-svg { display: inline-block; vertical-align: middle; width: 30px; height: 30px; }
+    .vtable { border-collapse: collapse; margin: 3px auto; }
+    .vtable td, .vtable th { border: 1px solid #94a3b8; text-align: center; padding: 0; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+  <header id="main-header" class="bg-amber-600 text-white shadow-md py-4 px-6 no-print">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <i data-lucide="coins" class="w-8 h-8 text-yellow-300"></i>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">[수학] 돈세기 맞춤형 학습지 생성기</h1>
+          <p class="text-xs text-amber-100">수학 교육과정 기반 맞춤형 문제 자동 생성 플랫폼 · <b class="text-yellow-200">made by 특수교사 슬옹쌤</b></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-sm text-amber-50 bg-black/20 px-3 py-1.5 rounded-lg">
+        <i data-lucide="info" class="w-4 h-4"></i>
+        <span>정확한 인쇄를 위해 <b>[배경 그래픽 인쇄]</b> 옵션을 켜주세요.</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-6">
+    <section id="option-panel" class="w-full md:w-96 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 shrink-0 self-start no-print"></section>
+
+    <section class="flex-1 flex flex-col gap-6">
+      <div id="print-control-toolbar" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center no-print">
+        <span class="text-sm font-medium text-slate-500">실시간 학습지 미리보기</span>
+        <select id="qr-mode" title="QR에 무엇을 담을지" onchange="QR_MODE=this.value;makeQRCodes();" class="ml-auto mr-2 rounded-lg border border-slate-200 px-2 py-2 text-xs bg-white font-semibold text-slate-600"><option value="link">QR: 정답지 페이지 열기</option><option value="text">QR: 정답 글자 (로그인 불필요)</option></select>
+          <button onclick="printSheet()" class="bg-amber-600 hover:opacity-90 text-white font-bold px-5 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md">
+          <i data-lucide="printer" class="w-5 h-5"></i> 인쇄 및 PDF 저장
+        </button>
+      </div>
+      <div id="print-pages-container" class="space-y-6"></div>
+    </section>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs mt-12 no-print border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 space-y-2">
+      <p>본 학습지는 수학과 교육과정의 수와 연산·실생활 돈 계산 내용 요소를 참고하여 구성했으며, 돈 그림은 학습용 도안입니다.</p>
+      <p>© 2026 돈세기 맞춤형 학습지 · <b class="text-slate-200">made by 특수교사 슬옹쌤</b></p>
+    </div>
+  </footer>
+
+  <script>
+    // ── QR 정답지 설정: 스캔하면 이 생성기의 정답지 화면이 바로 열려요 ──
+    const ANSWER_URL = 'https://teacher-sulong.github.io/worksheets/money.html';
+    let QR_MODE = 'link';
+    // 정답지 화면: 휴대폰 화면 폭에 학습지 한 장이 통째로 보이도록 맞춤
+    function fitAnswerView(){ if(!document.body.classList.contains('answer-view'))return; var c=document.getElementById('print-pages-container'); if(!c)return; c.style.zoom=Math.min(1,(window.innerWidth-12)/850); }
+    window.addEventListener('resize', fitAnswerView);
+    window.addEventListener('hashchange', function () { if (/^#k[-=]/.test(location.hash)) location.reload(); });
+// ═════════════════════ 공통 코어 (시계·달력 생성기와 동일한 구성) ═════════════════════
+// ───────── 시드 난수 (QR 재현용) ─────────
+function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+let rng = Math.random;
+function randInt(a,b){return Math.floor(rng()*(b-a+1))+a;}
+function pick(arr){return arr[Math.floor(rng()*arr.length)];}
+function shuffle(a){const r=a.slice();for(let i=r.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));const t=r[i];r[i]=r[j];r[j]=t;}return r;}
+function sample(a,n){return shuffle(a).slice(0,n);}
+function chance(p){return rng()<p;}
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return h>>>0;}
+function comma(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function plain(h){return String(h).replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();}
+function uniq(a){return [...new Set(a)];}
+function sum(a){return a.reduce((x,y)=>x+y,0);}
+
+// ───────── 한국어 조사 ─────────
+const NAMES=['이준','하준','도윤','서준','은우','시우','유준','주원','서윤','서아','이서','지유','하린','아린','시아','하은','소율','채원'];
+function hasBatchim(w){if(!w)return false;const c=w.charCodeAt(w.length-1);if(c<0xac00||c>0xd7a3)return false;return (c-0xac00)%28>0;}
+function dispName(n){return n+(hasBatchim(n)?'이':'');}
+function josaW(w,t){const b=hasBatchim(w);if(t==='eun')return b?'은':'는';if(t==='i')return b?'이':'가';if(t==='eul')return b?'을':'를';if(t==='wa')return b?'과':'와';if(t==='ro')return b?'으로':'로';return '';}
+function josaNum(s,t){const d=String(s).replace(/[^0-9]/g,'').slice(-1);const b='013678'.includes(d||'2');if(t==='eun')return b?'은':'는';if(t==='i')return b?'이':'가';if(t==='eul')return b?'을':'를';if(t==='wa')return b?'과':'와';return '';}
+function pickName(){return pick(NAMES);}
+function nm(n,t){const d=dispName(n);return d+josaW(d,t);}   // nm('하준','i') → 하준이가
+function jw(w,t){return w+josaW(w,t);}                       // jw('사과','eul') → 사과를
+
+// ───────── SVG 헬퍼 ─────────
+let _u=0;function uid(){return 'u'+(++_u);}
+function svgWrap(w,h,inner,cls){return `<svg class="viz ${cls||''}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" font-family="'Noto Sans KR',sans-serif">${inner}</svg>`;}
+function Tx(x,y,s,o){o=o||{};const size=o.size||12,fill=o.fill||'#1e293b',anchor=o.anchor||'middle',weight=o.weight||600;return `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}"${o.rot?` transform="rotate(${o.rot} ${x} ${y})"`:''}${o.op?` opacity="${o.op}"`:''}>${s}</text>`;}
+function ansG(inner){return `<g class="ansonly">${inner}</g>`;}
+function rnd1(n){return Math.round(n*10)/10;}
+function r2(n){return Math.round(n*100)/100;}
+
+// ───────── 상태 ─────────
+const ALL_S=['subjective','objective','narrative'];
+const KOREAN_STYLES={subjective:'주관식',objective:'객관식',narrative:'문장제'};
+let ALL_T=[],TYPE={};
+const O=()=>config.opt;
+let config=null,generatedPages=[],pageSeeds=[],showAnswers=false,answerViewMode=false;
+
+function initConfig(){
+  GEN.groups.forEach(g=>g.types.forEach(t=>{ALL_T.push(t.key);TYPE[t.key]=t;}));
+  config={pages:2,questionsPerPage:9,level:GEN.defLevel,progression:'single',bigMode:false,boldKey:true,opt:{},sel:{},
+    styles:ALL_S.slice(),types:ALL_T.slice(),typeWeights:{},dateStr:''};
+  GEN.checks.forEach(c=>config.opt[c.id]=!!c.def);
+  GEN.selects.forEach(s=>config.sel[s.id]=s.def);
+}
+
+// ───────── 문제 생성 ─────────
+function perQLevel(gi,total){
+  const L=config.level,mode=config.progression;
+  if(mode==='single'||L<=1||total<=1)return L;
+  const r=gi/(total-1);let v;
+  if(mode==='asc')v=1+Math.round(r*(L-1));
+  else if(mode==='desc')v=1+Math.round((1-r)*(L-1));
+  else v=randInt(1,L);
+  return Math.max(1,Math.min(L,v));
+}
+function makeQuestion(type,style,lv){
+  const o=GEN.build(type,style,lv);
+  if(!o)return null;
+  o.type=type;o.style=style;o.lv=lv;
+  if(!o.viz)o.viz='';
+  if(style==='objective'){
+    if(!o.choices){
+      const a=String(o.ans);
+      const ds=uniq((o.distract||[]).map(String)).filter(x=>x!==a);
+      if(ds.length<3)return null;
+      const ch=shuffle([a].concat(shuffle(ds).slice(0,3)));
+      o.choices=ch;o.correctIdx=ch.indexOf(a);
+    }
+    o.ansKey=(o.correctIdx+1)+'번';
+  } else {
+    o.ansKey=plain(o.ans);
+  }
+  return o;
+}
+function buildPageQuestions(seed,pIdx){
+  rng=mulberry32(seed>>>0);
+  const qpp=config.questionsPerPage,total=config.pages*qpp,out=[],seen=new Set();
+  const selT=ALL_T.filter(t=>config.types.includes(t));const types=selT.length?selT:[ALL_T[0]];
+  const selS=ALL_S.filter(s=>config.styles.includes(s));const styles=selS.length?selS:['subjective'];
+  for(let q=0;q<qpp;q++){
+    const gi=pIdx*qpp+q;const lv=perQLevel(gi,total);
+    const dist=t=>{const T=TYPE[t];return lv<T.minLv?T.minLv-lv:(lv>(T.maxLv||99)?lv-(T.maxLv||99):0);};
+    let cand=types.filter(t=>dist(t)===0);
+    if(!cand.length){const md=Math.min(...types.map(dist));cand=types.filter(t=>dist(t)===md);}
+    const pool=[];
+    cand.forEach(t=>{let w=Math.max(1,Math.min(5,config.typeWeights[t]||1));if(TYPE[t].minLv>=lv-1&&TYPE[t].minLv>1)w*=2;for(let i=0;i<w;i++)pool.push(t);});
+    let o=null;
+    for(let n=0;n<40;n++){
+      const type=pool[Math.floor(rng()*pool.length)];const T=TYPE[type];
+      const eLv=Math.max(T.minLv,Math.min(T.maxLv||99,lv));
+      const allowed=T.styles||ALL_S;let av=styles.filter(s=>allowed.includes(s));if(!av.length)av=[allowed[0]];
+      const style=pick(av);
+      let c=null;
+      try{c=makeQuestion(type,style,eLv);}catch(e){console.error('build error',type,e&&e.stack||e);c=null;}
+      if(!c)continue;
+      const sig=hash(plain(c.q)+'|'+c.ansKey+'|'+String(c.viz).replace(/u\d+/g,''));
+      if(!seen.has(sig)||n>=39){o=c;seen.add(sig);break;}
+    }
+    if(!o){
+      try{o=makeQuestion(types[0],'subjective',Math.max(TYPE[types[0]].minLv,Math.min(TYPE[types[0]].maxLv||99,lv)));}catch(e){console.error('fallback error',e);}
+    }
+    if(!o)o={q:'(문제 생성 오류)',viz:'',ans:'-',ansKey:'-',style:'subjective',type:types[0],lv:lv};
+    o.seq=q;out.push(o);
+  }
+  out.forEach((o,i)=>{o.num=i+1;o.globalNum=pIdx*qpp+i+1;});
+  return out;
+}
+
+// ───────── QR 자동 채점 (상태 인코딩) ─────────
+function encodeState(seed,pIdx){
+  let tmask=0;ALL_T.forEach((t,i)=>{if(config.types.includes(t))tmask|=(1<<i);});
+  let smask=0;ALL_S.forEach((s,i)=>{if(config.styles.includes(s))smask|=(1<<i);});
+  let flags=(config.bigMode?1:0)|(config.boldKey?2:0);
+  GEN.checks.forEach((c,i)=>{if(config.opt[c.id])flags|=(1<<(2+i));});
+  const parts=[flags,tmask,smask,config.questionsPerPage,config.pages,pIdx,(seed>>>0),config.level,({single:0,asc:1,desc:2,mix:3}[config.progression]||0)];
+  GEN.selects.forEach(s=>{parts.push(Math.max(0,s.options.findIndex(o=>o[0]===config.sel[s.id])));});
+  let wStr='',any=false;ALL_T.forEach(t=>{const w=Math.max(1,Math.min(5,config.typeWeights[t]||1));if(w!==1)any=true;wStr+=String(w);});
+  const out=parts.map(n=>n.toString(36));if(any)out.push(wStr);return out.join('-');
+}
+function decodeState(str){
+  const tok=str.split(/[.-]/);const nSel=GEN.selects.length;const p=tok.map((x,i)=>i<9+nSel?parseInt(x,36):x);
+  const flags=p[0];const wStr=(tok.length>9+nSel)?tok[9+nSel]:null;
+  const w={};ALL_T.forEach((t,i)=>{w[t]=wStr?(parseInt(wStr[i],10)||1):1;});
+  const opt={};GEN.checks.forEach((c,i)=>{opt[c.id]=!!(flags&(1<<(2+i)));});
+  const sel={};GEN.selects.forEach((s,i)=>{const o=s.options[p[9+i]];sel[s.id]=o?o[0]:s.def;});
+  return {big:(flags&1)?1:0,bk:(flags&2)?1:0,opt,sel,ty:ALL_T.filter((t,i)=>p[1]&(1<<i)),st:ALL_S.filter((s,i)=>p[2]&(1<<i)),qpp:p[3],pg:p[4],p:p[5],sd:(p[6]>>>0),lv:p[7]||1,prog:({0:'single',1:'asc',2:'desc',3:'mix'}[p[8]]||'single'),w};
+}
+function applyState(s){
+  config.bigMode=!!s.big;config.boldKey=!!s.bk;config.opt=s.opt;config.sel=s.sel;config.level=s.lv;config.progression=s.prog||'single';
+  config.styles=(s.st&&s.st.length)?s.st:['subjective'];config.types=(s.ty&&s.ty.length)?s.ty:[ALL_T[0]];
+  config.questionsPerPage=s.qpp;config.pages=s.pg;config.typeWeights=s.w||{};
+}
+function buildAnswerKeyText(pIdx){const qs=generatedPages[pIdx]||[];return qs.map(q=>`${q.globalNum}) ${q.ansKey}`).join('  ');}
+function makeQRCodes(){
+  if(typeof qrcode==='undefined')return;
+  try{if(qrcode.stringToBytesFuncs&&qrcode.stringToBytesFuncs['UTF-8'])qrcode.stringToBytes=qrcode.stringToBytesFuncs['UTF-8'];}catch(e){}
+  const hosted=(QR_MODE!=='text')&&(!!ANSWER_URL||/^https?:$/.test(location.protocol));const base=hosted?(ANSWER_URL||location.href.split('#')[0]):'';
+  generatedPages.forEach((_,pIdx)=>{
+    const el=document.getElementById('qr-'+pIdx);if(!el)return;
+    const data=hosted?(base+'#k-'+encodeState(pageSeeds[pIdx],pIdx)):buildAnswerKeyText(pIdx);
+    const draw=(txt,ec)=>{const qr=qrcode(0,ec);qr.addData(txt,'Byte');qr.make();el.innerHTML=qr.createSvgTag({cellSize:4,margin:3,scalable:true});const svg=el.querySelector('svg');if(svg){svg.setAttribute('width','100%');svg.setAttribute('height','100%');svg.style.display='block';}};
+    try{draw(data,'L');}catch(e){try{draw(data,'M');}catch(e2){el.innerHTML='<span class="text-[7px] text-slate-400">QR</span>';}}
+  });
+}
+function tryAnswerView(){
+  const h=location.hash||'';const i=h.search(/k[-=]/);if(i<0)return false;
+  let s;try{s=decodeState(h.slice(i+2));}catch(e){return false;}if(!s||s.sd===undefined||isNaN(s.sd))return false;
+  applyState(s);answerViewMode=true;showAnswers=true;
+  generatedPages=[buildPageQuestions(s.sd>>>0,s.p)];pageSeeds=[s.sd>>>0];
+  document.body.classList.add('answer-view');setTimeout(fitAnswerView,30);renderHTML();
+  document.querySelectorAll('.answer-box').forEach(el=>{el.classList.remove('invisible','opacity-0');el.classList.add('visible','opacity-100');});
+  const cont=document.getElementById('print-pages-container');
+  if(cont)cont.insertAdjacentHTML('afterbegin','<div class="max-w-[840px] mx-auto mb-3 bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold flex items-center justify-between"><span>✔ 정답지 (채점용) — made by 특수교사 슬옹쌤</span></div>');
+  tryIcons();return true;
+}
+
+// ───────── 옵션 패널 (동적 구성) ─────────
+function buildPanel(){
+  const C='amber-600';
+  const lvOpts=GEN.levels.map((l,i)=>`<option value="${i+1}"${(i+1)===GEN.defLevel?' selected':''}>${l.s} (${l.d})</option>`).join('');
+  const checks=GEN.checks.map(c=>`<label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-${c.id}" class="w-4 h-4 text-${C} rounded"${c.def?' checked':''} onchange="regenerateSheet()"><span>${c.label}</span></label>`).join('');
+  const sels=GEN.selects.map(s=>`<div class="space-y-3"><label class="block text-sm font-semibold text-slate-700">${s.title}</label><div class="grid grid-cols-${Math.min(3,s.options.length)} gap-2">${s.options.map(o=>`<label class="cursor-pointer border border-slate-200 rounded-lg p-2 flex flex-col items-center gap-1 bg-white hover:bg-slate-50 [&:has(input:checked)]:border-${C} [&:has(input:checked)]:bg-amber-50"><input type="radio" name="sel-${s.id}" value="${o[0]}" class="sr-only"${o[0]===s.def?' checked':''} onchange="regenerateSheet()"><span class="text-xs font-semibold text-center">${o[1]}</span></label>`).join('')}</div>${s.note?`<p class="text-xs text-slate-400">${s.note}</p>`:''}</div>`).join('');
+  const groups=GEN.groups.map(g=>`<div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">${g.label}</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-toggle w-3.5 h-3.5 text-${C} rounded" data-grp="grp-${g.id}" checked onchange="toggleGroup(this,'grp-${g.id}')">전체</label></div>
+        <div id="grp-${g.id}" class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">${g.types.map(t=>`<label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-${C} rounded" value="${t.key}" checked onchange="regenerateSheet()"><span>${t.label}</span></label>`).join('')}</div>`).join('');
+  document.getElementById('option-panel').innerHTML=`
+      <div class="flex items-center gap-2 pb-4 border-b border-slate-100">
+        <i data-lucide="sliders" class="w-5 h-5 text-${C}"></i>
+        <h2 class="text-lg font-bold text-slate-950">학습지 형성 옵션</h2>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">인쇄 페이지 수 (최대 10장)</label>
+        <select id="sheet-pages" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none font-medium" onchange="setPagesDropdown(this.value)">
+          ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${n===2?' selected':''}>${n}장 ${n===10?'대량 생성':'생성'}</option>`).join('')}
+        </select>
+        <p class="text-xs text-slate-400">각 페이지당 최대 9개의 문제가 포함됩니다.</p>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700 flex justify-between"><span>페이지당 문제 수</span><span id="num-of-questions-val" class="text-${C} font-bold">9개</span></label>
+        <input type="range" id="questions-count" min="1" max="9" value="9" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-${C}" oninput="updateQuestionsCount(this.value)">
+        <div class="flex justify-between text-[10px] text-slate-400"><span>1개</span><span>3개 (1줄)</span><span>6개 (2줄)</span><span>9개 (3줄)</span></div>
+      </div>
+      <div class="space-y-3">
+        <label for="difficulty" class="block text-sm font-semibold text-slate-700">${GEN.levelTitle}</label>
+        <select id="difficulty" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none" onchange="regenerateSheet()">${lvOpts}</select>
+      </div>
+      <div class="space-y-3">
+        <label for="progression" class="block text-sm font-semibold text-slate-700">난이도 배치 방식</label>
+        <select id="progression" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-${C} focus:outline-none" onchange="regenerateSheet()">
+          <option value="single" selected>단일 (선택한 단계로 고정)</option>
+          <option value="asc">쉬움 → 어려움 (오름차순)</option>
+          <option value="desc">어려움 → 쉬움 (내림차순)</option>
+          <option value="mix">혼합 (무작위 섞기)</option>
+        </select>
+        <p class="text-xs text-slate-400">단일이 아니면 위에서 고른 단계를 <b>최고 난이도</b>로 보고 1단계부터 분배합니다.</p>
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">세부 옵션 설정 <span class="text-[11px] font-normal text-slate-400">${GEN.optNote}</span></label>
+        <div class="space-y-2 bg-slate-50 border border-slate-100 rounded-lg p-3">
+          ${checks}
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-big" class="w-4 h-4 text-${C} rounded" onchange="regenerateSheet()"><span><b>큰 글씨·큰 그림</b> <span class="text-[10px] text-${C} font-semibold">(적정 6문제 추천)</span></span></label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="opt-boldkey" class="w-4 h-4 text-${C} rounded" checked onchange="regenerateSheet()"><span>문제의 <b>중요 부분 볼드 처리</b> (끄면 균일한 글씨)</span></label>
+        </div>
+      </div>
+      ${sels}
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">문제 문항 방식 (중복 선택)</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-subjective" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>주관식 (일반 서술형)</span></label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-objective" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>객관식 (4지 선다형)</span></label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer"><input type="checkbox" id="style-narrative" checked class="w-4 h-4 text-${C} border-slate-300 rounded" onchange="regenerateSheet()"><span>문장제 (실생활 맥락 시나리오)</span></label>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">수학 문제 세부 유형</label>
+        <p class="text-[11px] text-slate-400 leading-relaxed">각 항목 오른쪽 숫자(1~5)로 <b>출제 비중</b>을, 영역 제목 옆 <b>전체</b> 체크로 해당 영역을 한 번에 켜고 끌 수 있어요.</p>
+        ${groups}
+      </div>
+      <div class="pt-4 border-t border-slate-100 flex flex-col gap-2">
+        <button onclick="regenerateSheet()" class="w-full bg-slate-900 text-white font-bold py-3 px-4 rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4"></i> 새로운 문제 생성하기</button>
+        <button onclick="toggleAnswers()" id="toggle-ans-btn" class="w-full bg-amber-50 border border-amber-200 text-${C} font-semibold py-2.5 px-4 rounded-xl hover:bg-amber-100 transition flex items-center justify-center gap-2"><i data-lucide="eye" id="eye-icon" class="w-4 h-4"></i> <span id="ans-text">답안 정답 보이기</span></button>
+      </div>`;
+}
+function readOptions(){
+  const g=id=>document.getElementById(id);
+  config.level=parseInt(g('difficulty').value)||GEN.defLevel;
+  config.progression=g('progression').value||'single';
+  GEN.checks.forEach(c=>{config.opt[c.id]=g('opt-'+c.id).checked;});
+  config.bigMode=g('opt-big').checked;config.boldKey=g('opt-boldkey').checked;
+  GEN.selects.forEach(s=>{const r=document.querySelector(`input[name="sel-${s.id}"]:checked`);config.sel[s.id]=r?r.value:s.def;});
+  config.typeWeights={};document.querySelectorAll('.type-weight').forEach(i=>config.typeWeights[i.dataset.type]=Math.max(1,Math.min(5,parseInt(i.value)||1)));
+  const st=[];if(g('style-subjective').checked)st.push('subjective');if(g('style-objective').checked)st.push('objective');if(g('style-narrative').checked)st.push('narrative');
+  config.styles=st.length?st:['subjective'];if(!st.length)g('style-subjective').checked=true;
+  const ty=[];document.querySelectorAll('.type-checkbox:checked').forEach(e=>ty.push(e.value));
+  config.types=ty.length?ty:[ALL_T[0]];if(!ty.length)document.querySelector('.type-checkbox').checked=true;
+}
+function toggleGroup(cb,gid){const g=document.getElementById(gid);if(g)g.querySelectorAll('.type-checkbox').forEach(x=>{x.checked=cb.checked;});regenerateSheet();}
+function syncGroupToggles(){document.querySelectorAll('.group-toggle').forEach(gt=>{const g=document.getElementById(gt.dataset.grp);if(!g)return;const items=[...g.querySelectorAll('.type-checkbox')];gt.checked=items.length>0&&items.every(x=>x.checked);});}
+function regenerateSheet(){
+  syncGroupToggles();readOptions();generatedPages=[];pageSeeds=[];
+  const base=((Date.now()^Math.floor(Math.random()*0x1000000))&0xFFFFFF)>>>0;
+  for(let p=0;p<config.pages;p++){const sd=(base+p*0x9E3779B1)>>>0;pageSeeds.push(sd);generatedPages.push(buildPageQuestions(sd,p));}
+  renderHTML();tryIcons();
+}
+
+// ───────── 학습지 HTML ─────────
+function renderChoices(q){
+  const maxLen=Math.max(...q.choices.map(x=>plain(x).length));
+  const long=maxLen>9;
+  const svgC=q.choices.some(x=>/<svg/.test(x));
+  const cols=svgC?'grid-cols-4':(maxLen>13?'grid-cols-1':'grid-cols-2');
+  return `<div class="mt-1.5"><div class="grid ${cols} gap-x-1 gap-y-0.5">${q.choices.map((ch,i)=>`<div class="${long?'text-[10px]':'text-[11px]'} text-slate-600 flex items-center gap-1"><span class="inline-block w-3.5 h-3.5 shrink-0 rounded-full border border-slate-300 text-[9px] text-center leading-3.5 font-bold">${i+1}</span><span class="${svgC?'':(maxLen>13?'flex-1 break-keep leading-tight':'flex-1 break-keep leading-tight')}">${ch}</span></div>`).join('')}</div><div class="mt-1 text-[9px] border-t border-slate-100 pt-0.5 text-slate-400">정답 기입: ( <span class="answer-box ${showAnswers?'visible text-red-500 font-bold text-xs':'invisible opacity-0'}">${q.correctIdx+1}</span> )</div></div>`;
+}
+// 카드 내용이 넘칠 때 자동으로 조금씩 줄여 맞춤(잘림 방지)
+function fitCards(){document.querySelectorAll('.print-area > div.grid > div').forEach(function(card){var inner=card.children[0];if(!inner)return;inner.style.zoom='';var z=1,g=0;while(card.scrollHeight-card.clientHeight>1&&z>0.5&&g++<14){z=Math.max(0.5,z-0.05);inner.style.zoom=z;}});}
+function renderHTML(){
+  const c=document.getElementById('print-pages-container');if(!c)return;c.innerHTML='';
+  const bg='bg-amber-600 text-white border-amber-600 font-bold',off='bg-slate-50 text-slate-400 border-slate-200 font-normal';
+  generatedPages.forEach((questions,pIdx)=>{
+    const page=document.createElement('div');
+    page.className="bg-white p-5 md:p-6 shadow-lg border border-slate-200 rounded-2xl print-area page-break max-w-[840px] mx-auto h-[1180px] overflow-hidden flex flex-col"+(config.bigMode?" big-mode":"")+(showAnswers?" show-ans":"");
+    const sBadges=ALL_S.map(s=>`<span class="${config.styles.includes(s)?bg:off} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${KOREAN_STYLES[s]}</span>`).join('');
+    const tBadges=ALL_T.map(t=>`<span class="${config.types.includes(t)?bg:off} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${TYPE[t].short||TYPE[t].label}</span>`);
+    const tRows=[];for(let i=0;i<tBadges.length;i+=6)tRows.push(`<div class="flex gap-1 flex-wrap">${tBadges.slice(i,i+6).join('')}</div>`);
+    const progLbl={single:'단일 (고정)',asc:'쉬움→어려움',desc:'어려움→쉬움',mix:'혼합 (무작위)'}[config.progression]||'단일 (고정)';
+    const L=GEN.levels[config.level-1]||GEN.levels[0];
+    const lvMain=(config.progression==='single')?`${L.s} · ${L.d}`:`${L.s}까지 (${progLbl})`;
+    const pageNum=(questions[0]&&questions[0].globalNum)?Math.floor((questions[0].globalNum-1)/config.questionsPerPage)+1:(pIdx+1);
+    const extra=(GEN.info?GEN.info():[]).map(x=>`<div>${x}</div>`).join('');
+    const qrBlock=`<div class="flex flex-col items-center gap-0.5 shrink-0"><div id="qr-${pIdx}" class="w-[100px] h-[100px] bg-white border border-slate-200 rounded p-1 flex items-center justify-center overflow-hidden"></div><span class="text-[8px] text-slate-500 font-bold leading-none">정답 QR (스캔)</span></div>`;
+    const header=`<div class="border-b-2 border-slate-800 pb-2 mb-2">
+      <div class="flex justify-between items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="bg-amber-600 text-white text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full">PAGE ${pageNum}</span>
+            <h1 class="text-xl font-extrabold tracking-tight text-slate-900">${GEN.title} 맞춤형 학습지</h1>
+            <span class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full">made by 특수교사 슬옹쌤</span>
+          </div>
+          <div class="flex flex-col gap-1.5 mt-2.5 text-[10px] items-start">
+            <div class="flex flex-wrap items-center gap-1"><span class="font-extrabold text-slate-600 text-[9px] uppercase whitespace-nowrap">문항 방식:</span>${sBadges}</div>
+            <div class="flex items-start gap-1"><span class="font-extrabold text-slate-600 text-[9px] uppercase pt-0.5 whitespace-nowrap">세부 유형:</span><div class="flex flex-col gap-1">${tRows.join('')}</div></div>
+          </div>
+        </div>
+        <div class="flex items-start gap-2 shrink-0">
+          <div class="text-right text-[10px] text-slate-600 space-y-0.5 bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-medium max-w-[190px]">
+            <div>출력 일자: ${config.dateStr}</div><div>학습 단계: ${lvMain}</div>${extra}<div>총 문항수: ${config.questionsPerPage}문항</div>
+          </div>
+          ${qrBlock}
+        </div>
+      </div>
+    </div>`;
+    const cols=config.bigMode?2:3;const gridRows=Math.max(1,Math.ceil(config.questionsPerPage/cols));
+    const rowH=(930-(gridRows-1)*10)/gridRows;const vmax=Math.max(70,Math.floor(rowH-(config.bigMode?112:122)));
+    let grid=`<div class="grid gap-2.5 flex-1 min-h-0" style="--vmax:${vmax}px;grid-template-columns:repeat(${cols},minmax(0,1fr));grid-template-rows:repeat(${gridRows},minmax(0,1fr));">`;
+    questions.forEach(q=>{
+      let ans;
+      if(q.style==='objective'&&q.choices){ans=renderChoices(q);}
+      else{ans=`<div class="mt-1.5 border-b border-dashed border-slate-300 pb-0.5 flex items-baseline"><span class="text-[9px] text-slate-400 font-semibold mr-1 shrink-0 whitespace-nowrap">정답 :</span><span class="answer-box text-[11px] font-extrabold text-red-500 pl-0.5 ${showAnswers?'visible':'invisible opacity-0'}">${q.ans}</span></div>`;}
+      let qt=q.q;if(!config.boldKey)qt=qt.replace(/<\/?b>/g,'');
+      grid+=`<div class="flex flex-col justify-between border border-slate-200 p-2 rounded-xl bg-white relative overflow-hidden min-h-0 min-w-0">
+        <div class="min-h-0"><div class="flex justify-between items-center w-full mb-0.5"><span class="font-black text-amber-600 text-xs md:text-sm">${q.globalNum}.</span><span class="text-[7.5px] bg-slate-100 text-slate-500 border border-slate-200 px-1 rounded font-bold">${(GEN.levels[q.lv-1]||{s:''}).s}</span></div>
+        <p class="qtext-el text-[11.5px] md:text-xs font-medium text-slate-900 leading-normal">${qt}</p>${q.viz}</div>
+        <div>${ans}</div></div>`;
+    });
+    grid+=`</div>`;
+    const wm=`<div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[8px] text-slate-300"><span>ⓒ made by 특수교사 슬옹쌤 · ${GEN.title} 학습지 자동 생성</span><span>PAGE ${pageNum} / ${config.pages}</span></div>`;
+    page.innerHTML=header+grid+wm;c.appendChild(page);
+  });
+  try{fitCards();}catch(e){}
+  makeQRCodes();
+}
+
+// ───────── 컨트롤 ─────────
+function tryIcons(){try{if(typeof lucide!=='undefined'&&lucide.createIcons)lucide.createIcons();}catch(e){}}
+function initDate(){const t=new Date();config.dateStr=`${t.getFullYear()}년 ${String(t.getMonth()+1).padStart(2,'0')}월 ${String(t.getDate()).padStart(2,'0')}일`;}
+function setPagesDropdown(v){config.pages=parseInt(v);regenerateSheet();}
+function updateQuestionsCount(v){document.getElementById('num-of-questions-val').innerText=v+'개';config.questionsPerPage=parseInt(v);regenerateSheet();}
+function toggleAnswers(){
+  showAnswers=!showAnswers;const at=document.getElementById('ans-text'),ei=document.getElementById('eye-icon');
+  if(showAnswers){at.innerText='답안 정답 숨기기';ei.setAttribute('data-lucide','eye-off');}else{at.innerText='답안 정답 보이기';ei.setAttribute('data-lucide','eye');}
+  renderHTML();tryIcons();
+}
+function setupTypeWeights(){
+  document.querySelectorAll('.type-checkbox').forEach(cb=>{const label=cb.closest('label');if(!label||label.querySelector('.type-weight'))return;
+    const inp=document.createElement('input');inp.type='number';inp.min='1';inp.max='5';inp.value='1';
+    inp.className='type-weight ml-auto w-9 text-[10px] text-center border border-slate-200 rounded px-0.5 py-0.5';inp.dataset.type=cb.value;inp.title='출제 비중(1~5)';
+    inp.addEventListener('click',e=>e.stopPropagation());inp.addEventListener('input',()=>regenerateSheet());label.appendChild(inp);});
+}
+function printSheet(){try{if(window.self!==window.top){window.parent.focus();window.parent.print();return;}}catch(e){}try{window.focus();window.print();}catch(e){}}
+
+// ═════════════════════ 돈 세기 ═════════════════════
+// 한국 동전(10·50·100·500원)과 지폐(1,000·5,000·10,000·50,000원)의 색·크기 비율·표기를 따라 그린 학습용 도안
+const COIN={
+  10:{d:18,c1:'#f3b27a',c2:'#b5622a',edge:'#8a4a1c',ink:'#6a3511'},
+  50:{d:21.6,c1:'#ffffff',c2:'#b3b8bf',edge:'#868c94',ink:'#3f4650'},
+  100:{d:24,c1:'#ffffff',c2:'#adb2b9',edge:'#7f858d',ink:'#383f49'},
+  500:{d:26.5,c1:'#ffffff',c2:'#a6abb3',edge:'#767c85',ink:'#2f3640'}};
+const BILL={
+  1000:{w:136,c1:'#a9cbe6',c2:'#5f93c2',ink:'#1f4568',ko:'천 원'},
+  5000:{w:142,c1:'#efb596',c2:'#c9693f',ink:'#6b2a10',ko:'오천 원'},
+  10000:{w:148,c1:'#b0d9ab',c2:'#5da86a',ink:'#1b5226',ko:'만 원'},
+  50000:{w:154,c1:'#f6dc8a',c2:'#e0a233',ink:'#6a4300',ko:'오만 원'}};
+const BILL_H=68;
+function won(n){return (O().comma?comma(n):String(n))+'원';}
+function koNum(n){
+  if(n===0)return '영';
+  const D=['','일','이','삼','사','오','육','칠','팔','구'];
+  const four=x=>{let s='';[[1000,'천'],[100,'백'],[10,'십'],[1,'']].forEach(([p,u])=>{const d=Math.floor(x/p)%10;if(!d)return;if(d===1&&p>1)s+=u;else s+=D[d]+u;});return s;};
+  const hi=Math.floor(n/10000),lo=n%10000;let s='';
+  if(hi)s+=(hi===1?'':four(hi))+'만';
+  if(lo)s+=(s?' ':'')+four(lo);
+  return s;
+}
+function koWon(n){return koNum(n)+' 원';}
+
+function moneyDefs(id){
+  let s='<defs>';
+  for(const v in COIN){const c=COIN[v];s+=`<radialGradient id="${id}c${v}" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="${c.c1}"/><stop offset="1" stop-color="${c.c2}"/></radialGradient>`;}
+  for(const v in BILL){const b=BILL[v];s+=`<linearGradient id="${id}b${v}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${b.c1}"/><stop offset="1" stop-color="${b.c2}"/></linearGradient>`;}
+  return s+'</defs>';
+}
+function drawCoin(cx,cy,v,s,id,rot){
+  const c=COIN[v],R=c.d*s/2;
+  let g=`<g transform="translate(${r2(cx)} ${r2(cy)})${rot?` rotate(${rot})`:''}">`;
+  g+=`<circle r="${r2(R)}" fill="url(#${id}c${v})" stroke="${c.edge}" stroke-width="${r2(Math.max(.6,R*.05))}"/>`;
+  if(v!==10)g+=`<circle r="${r2(R*.93)}" fill="none" stroke="${c.edge}" stroke-opacity=".55" stroke-width="${r2(R*.1)}" stroke-dasharray="${r2(R*.06)} ${r2(R*.06)}"/>`;
+  g+=`<circle r="${r2(R*.8)}" fill="none" stroke="${c.edge}" stroke-opacity=".6" stroke-width="${r2(Math.max(.4,R*.03))}"/>`;
+  const fs=R*(v===10?.95:v===50?.9:.78);
+  g+=Tx(0,r2(fs*.2+R*.1),v,{size:r2(fs),fill:c.ink,weight:900});
+  if(R>=11){g+=Tx(0,r2(-R*.5),'한국은행',{size:r2(R*.19),fill:c.ink,weight:700});g+=Tx(0,r2(R*.74),'2024',{size:r2(R*.18),fill:c.ink,weight:600});}
+  return g+'</g>';
+}
+function drawBill(x,y,v,s,id,spec,rot){
+  const b=BILL[v],W=b.w,H=BILL_H;
+  let g=`<g transform="translate(${r2(x)} ${r2(y)}) scale(${r2(s*1000)/1000})${rot?` rotate(${rot} ${W/2} ${H/2})`:''}">`;
+  g+=`<rect x=".4" y=".4" width="${W-.8}" height="${H-.8}" rx="3" fill="url(#${id}b${v})" stroke="${b.ink}" stroke-width=".9"/>`;
+  for(let i=0;i<9;i++){const y0=6+i*7;let d=`M2 ${y0}`;for(let xx=2;xx<W-12;xx+=10)d+=` q5 ${i%2?-3:3} 10 0`;g+=`<path d="${d}" fill="none" stroke="${b.ink}" stroke-opacity=".13" stroke-width=".6"/>`;}
+  g+=`<rect x="3" y="3" width="${W-6}" height="${H-6}" rx="2" fill="none" stroke="${b.ink}" stroke-opacity=".5" stroke-width=".7"/>`;
+  const mx=W*.2,my=36;
+  g+=`<ellipse cx="${r2(mx)}" cy="${my}" rx="17" ry="23" fill="#fff" fill-opacity=".35" stroke="${b.ink}" stroke-opacity=".7" stroke-width=".8"/>`;
+  for(let a=0;a<180;a+=20)g+=`<ellipse cx="${r2(mx)}" cy="${my}" rx="13" ry="3.4" transform="rotate(${a} ${r2(mx)} ${my})" fill="none" stroke="${b.ink}" stroke-opacity=".55" stroke-width=".6"/>`;
+  g+=`<circle cx="${r2(mx)}" cy="${my}" r="3" fill="${b.ink}" fill-opacity=".45"/>`;
+  g+=Tx(r2(W*.6),12.5,'한국은행',{size:6.5,fill:b.ink,weight:800});
+  g+=Tx(9,14,v,{size:7.5,fill:b.ink,weight:800,anchor:'start'});
+  g+=Tx(W-7,21,v,{size:13,fill:b.ink,weight:900,anchor:'end'});
+  g+=Tx(r2(W*.62),44,b.ko,{size:13,fill:b.ink,weight:800,op:.85});
+  g+=Tx(8,H-5.5,v,{size:6.5,fill:b.ink,weight:800,anchor:'start'});
+  g+=Tx(W-7,H-6,v,{size:9,fill:b.ink,weight:800,anchor:'end'});
+  if(spec)g+=Tx(W/2,H/2+8,'견본',{size:20,fill:'#dc2626',weight:900,rot:-14,op:.24});
+  return g+'</g>';
+}
+function mLayout(items,W,Hmax){
+  const dim=it=>it.kind==='coin'?[COIN[it.v].d,COIN[it.v].d]:[BILL[it.v].w,BILL_H];
+  const scales=[3.4,3,2.65,2.35,2.1,1.85,1.65,1.5,1.35,1.22,1.1,1,.9,.8,.72,.64,.56,.5,.44];
+  const gap=6;let last=null;
+  for(const s of scales){
+    const rows=[];let cur=[],cw=0,wide=false;
+    for(const it of items){
+      const d=dim(it),w=d[0]*s,h=d[1]*s;
+      if(w>W){wide=true;break;}
+      if(cur.length&&cw+gap+w>W){rows.push(cur);cur=[];cw=0;}
+      cw+=(cur.length?gap:0)+w;cur.push({it,w,h});
+    }
+    if(wide)continue;
+    if(cur.length)rows.push(cur);
+    const H=sum(rows.map(r=>Math.max(...r.map(e=>e.h))))+gap*(rows.length-1);
+    last={s,rows,H,gap};
+    if(H<=Hmax)return last;
+  }
+  return last;
+}
+function drawLayout(L,id,x0,y0,W,scatter,spec){
+  let out='',y=y0;
+  L.rows.forEach(r=>{
+    const rh=Math.max(...r.map(e=>e.h)),rw=sum(r.map(e=>e.w))+L.gap*(r.length-1);let x=x0+(W-rw)/2;
+    r.forEach(e=>{
+      let dx=0,dy=0,rot=0;
+      if(scatter){dx=(rng()-.5)*L.gap*.9;dy=(rng()-.5)*(rh-e.h)*.9;rot=Math.round((rng()-.5)*(e.it.kind==='coin'?60:14));}
+      const cy=y+rh/2+dy;
+      if(e.it.kind==='coin')out+=drawCoin(x+e.w/2+dx,cy,e.it.v,L.s,id,rot);
+      else out+=drawBill(x+dx,cy-e.h/2,e.it.v,L.s,id,spec,rot);
+      x+=e.w+L.gap;
+    });
+    y+=rh+L.gap;
+  });
+  return out;
+}
+function moneyViz(items,Hmax){
+  const id=uid(),W=240;
+  items=O().scatter?shuffle(items):sortItems(items);
+  const pad=O().scatter?10:0;
+  const L=mLayout(items,W-2*pad,(Hmax||150)-2*pad);
+  const body=drawLayout(L,id,pad,2+pad,W-2*pad,O().scatter,O().specimen);
+  return svgWrap(W,Math.ceil(L.H+6+2*pad),moneyDefs(id)+body);
+}
+function sortItems(items){return items.slice().sort((a,b)=>(a.kind===b.kind?b.v-a.v:(a.kind==='bill'?-1:1)));}
+function panelsViz(groups,labels,Hmax){
+  const id=uid(),W=240,n=groups.length,gp=6,ph=(Hmax-gp*(n-1))/n;
+  let out=moneyDefs(id),y=0;
+  groups.forEach((items,i)=>{
+    items=O().scatter?shuffle(items):sortItems(items);
+    const pad=O().scatter?7:0;const L=mLayout(items,W-48-2*pad,ph-8-2*pad);const H=Math.max(L.H+8+2*pad,34);
+    out+=`<rect x="1" y="${r2(y)}" width="${W-2}" height="${r2(H)}" rx="9" fill="#f8fafc" stroke="#cbd5e1"/>`;
+    out+=`<circle cx="20" cy="${r2(y+H/2)}" r="12" fill="#475569"/>`+Tx(20,r2(y+H/2+5),labels[i],{size:14,fill:'#fff',weight:800});
+    out+=drawLayout(L,id,40+pad,y+(H-L.H)/2,W-48-2*pad,O().scatter,O().specimen);
+    y+=H+gp;
+  });
+  return svgWrap(W,Math.ceil(y-gp+2),out);
+}
+
+// ───── 금액 생성 ─────
+const COIN_V=[10,50,100,500];
+function denoms(lv){const d=COIN_V.slice();if(lv>=4)d.push(1000);if(lv>=5)d.push(5000,10000);if(lv>=6)d.push(50000);return d;}
+function itemOf(v){return {kind:v>=1000?'bill':'coin',v};}
+function noun(v){return v>=1000?'장':'개';}
+function kname(v){return v>=1000?'지폐':'동전';}
+function total(items){return sum(items.map(i=>i.v));}
+function genItems(lv,small){
+  lv=Math.min(lv,6);const items=[];const add=(kind,v,c)=>{for(let i=0;i<c;i++)items.push({kind,v});};
+  if(lv===1){add('coin',pick([10,100,10,100,50,500]),small?randInt(2,5):randInt(2,9));}
+  else if(lv===2){add('coin',10,randInt(1,small?3:6));add('coin',100,randInt(1,small?3:6));}
+  else if(lv===3){sample(COIN_V,randInt(2,small?3:4)).forEach(v=>add('coin',v,randInt(1,small?2:(v>=500?3:4))));}
+  else if(lv===4){add('bill',1000,randInt(1,small?1:3));sample(COIN_V,randInt(1,small?2:3)).forEach(v=>add('coin',v,randInt(1,small?2:3)));}
+  else if(lv===5){sample([1000,5000,10000],randInt(small?1:1,small?1:2)).forEach(v=>add('bill',v,randInt(1,small?1:(v===1000?3:2))));sample([100,500],randInt(0,small?1:2)).forEach(v=>add('coin',v,randInt(1,small?2:3)));}
+  else{sample([1000,5000,10000,50000],randInt(2,small?2:3)).forEach(v=>add('bill',v,randInt(1,small?1:2)));sample(COIN_V,randInt(0,small?1:2)).forEach(v=>add('coin',v,randInt(1,small?2:3)));}
+  return items;
+}
+function amtDistract(t,items){
+  const mn=Math.min(...items.map(i=>i.v));
+  const c=[t+mn,t-mn,t+2*mn,t-2*mn,t+10,t-10,t+100,t-100,t+500,t-500,t+1000,t-1000,t+5*mn].filter(x=>x>0&&x!==t);
+  return c.map(won);
+}
+function numDistract(n){
+  const s=String(n),c=new Set();
+  c.add(n*10);if(n%10===0&&n>=100)c.add(n/10);
+  for(let i=1;i<s.length;i++)c.add(parseInt(s.slice(0,i)+'0'+s.slice(i)));
+  for(let i=0;i<s.length-2;i++){if(s[i]!==s[i+1]){const a=s.split('');const t=a[i];a[i]=a[i+1];a[i+1]=t;if(a[0]!=='0')c.add(parseInt(a.join('')));}}
+  for(let i=0;i<s.length-1;i++){for(const d of [-1,1]){const a=s.split('');const v=parseInt(a[i])+d;if(v<0||v>9||(i===0&&v===0))continue;a[i]=String(v);c.add(parseInt(a.join('')));}}
+  c.delete(n);return [...c].filter(x=>x>=10&&x%10===0);
+}
+function tagViz(text,sub){
+  const W=240,H=sub?74:60;const w=Math.min(220,Math.max(120,String(text).length*17+50));const x=(W-w)/2;
+  return svgWrap(W,H,`<path d="M${x+22} 4 H${x+w-6} a8 8 0 0 1 8 8 V${H-10} a8 8 0 0 1 -8 8 H${x+22} L${x+2} ${H/2-3} Z" fill="#fff8e1" stroke="#d97706" stroke-width="2"/><circle cx="${x+22}" cy="${H/2-3}" r="4.5" fill="#fff" stroke="#d97706" stroke-width="1.6"/>`+Tx(x+22+(w-22)/2,sub?30:H/2+6,text,{size:text.length>9?17:21,weight:900,fill:'#92400e'})+(sub?Tx(x+22+(w-22)/2,54,sub,{size:12,weight:600,fill:'#b45309'}):''));
+}
+function randAmount(lv){
+  if(lv<=3)return randInt(10,200)*10;
+  if(lv===4)return randInt(100,999)*10;
+  if(lv===5)return randInt(10,990)*100;
+  return randInt(100,1500)*100+(chance(.4)?randInt(0,9)*10:0);
+}
+const SHOP_LO=['사탕','과자','껌','연필','지우개','우유','주스','아이스크림','젤리','초콜릿','풍선','스티커','볼펜','자','물','빵','공책'];
+const SHOP_MID=['필통','색연필','인형','장난감','양말','모자','동화책','크레파스','도시락'];
+const SHOP_HI=['운동화','가방','외투','자전거','시계','게임기','로봇 장난감'];
+function itemFor(P){return pick(P<3000?SHOP_LO:P<30000?SHOP_MID.concat(P<10000?[]:SHOP_HI.slice(0,2)):SHOP_HI);}
+const SHOP=['사탕','과자','껌','연필','공책','지우개','우유','빵','주스','아이스크림','물','풍선','스티커','볼펜','자','도화지','양말','필통','색연필','젤리','초콜릿','인형','장난감','모자'];
+function payBill(P){return [1000,5000,10000,50000].find(b=>b>P)||50000;}
+// 가장 적은 개수로 만들기(탐욕) — 이 화폐 체계에서는 최적
+function greedy(amount,ds){const r=[];let a=amount;ds.slice().sort((x,y)=>y-x).forEach(d=>{const c=Math.floor(a/d);r.push([d,c]);a-=c*d;});return r;}
+
+const GEN={
+  id:'money',title:'돈세기',headTitle:'돈세기',
+  levelTitle:'돈세기 난이도 세부 설정',optNote:'(표기·돈 표시 방식)',
+  levels:[
+    {s:'1단계',d:'같은 동전 세기'},
+    {s:'2단계',d:'10원·100원 섞어 세기'},
+    {s:'3단계',d:'동전 모두 (10·50·100·500원)'},
+    {s:'4단계',d:'1,000원 지폐 + 동전'},
+    {s:'5단계',d:'5,000원·10,000원 지폐'},
+    {s:'6단계',d:'50,000원까지 모든 화폐'},
+    {s:'7단계',d:'물건 사기·거스름돈'}],
+  defLevel:3,
+  checks:[
+    {id:'comma',label:'금액에 <b>천 단위 쉼표</b> 표기 (1,000원)',def:true},
+    {id:'scatter',label:'돈을 <b>흩어서</b> 배치 (기본: 가지런히 정렬)',def:false},
+    {id:'specimen',label:'지폐에 <b>\'견본\'</b> 표시 (학습용 도안)',def:true}],
+  selects:[],
+  groups:[
+    {id:'read',label:'돈 알아보기·세기',types:[
+      {key:'identify',label:'동전·지폐 이름(금액) 알아보기',short:'금액 알기',minLv:1},
+      {key:'total',label:'돈이 모두 얼마인지 세기',short:'모두 얼마',minLv:1},
+      {key:'howMany',label:'특정 동전·지폐가 몇 개(장)인지',short:'몇 개',minLv:2},
+      {key:'write',label:'금액 읽고 쓰기 (한글 ↔ 숫자)',short:'읽고 쓰기',minLv:3}]},
+    {id:'relate',label:'돈의 관계·비교',types:[
+      {key:'exchange',label:'바꾸기 (100원 = 10원 몇 개?)',short:'바꾸기',minLv:2},
+      {key:'compare',label:'어느 쪽이 더 많은지 비교',short:'금액 비교',minLv:3},
+      {key:'order',label:'금액이 많은 순서 나열',short:'순서 나열',minLv:4}]},
+    {id:'make',label:'금액 만들기',types:[
+      {key:'payGreedy',label:'금액을 큰 돈부터 내는 방법 (빈칸 채우기)',short:'큰 돈부터',minLv:3,styles:['subjective','narrative']},
+      {key:'missing',label:'목표 금액까지 몇 개 더 필요한지',short:'더 필요',minLv:4},
+      {key:'fewest',label:'가장 적은 개수로 내면 모두 몇 개?',short:'최소 개수',minLv:5}]},
+    {id:'shop',label:'물건 사기',types:[
+      {key:'afford',label:'가진 돈으로 살 수 있는지 판단',short:'살 수 있나',minLv:5},
+      {key:'short',label:'모자라는 돈 구하기',short:'모자란 돈',minLv:5},
+      {key:'change',label:'거스름돈 구하기',short:'거스름돈',minLv:6},
+      {key:'buyTwo',label:'두 물건 사고 거스름돈 구하기',short:'두 개 사기',minLv:7}]}],
+  footNote:'본 학습지는 수학과 교육과정의 수와 연산·실생활 돈 계산 내용 요소를 참고하여 구성했으며, 돈 그림은 학습용 도안입니다.',
+  build(type,style,lv){
+    const nar=style==='narrative';const n=pickName();
+    const mk=(q,viz,ans,distract,extra)=>Object.assign({q,viz,ans,distract},extra||{});
+    switch(type){
+      case 'identify':{
+        const v=(lv>=4&&chance(.5))?pick(denoms(lv).filter(x=>x>=1000)):pick(COIN_V);
+        const ds=(v>=1000?denoms(lv):COIN_V).filter(x=>x!==v).map(won);
+        const k=kname(v);
+        return mk(nar?`${nm(n,'i')} 길에서 ${k}${josaW(k,'eul')} 주웠어요. 이 ${k}${josaW(k,'eun')} <b>얼마짜리</b>일까요?`:`이 <b>${k}</b>${josaW(k,'eun')} 얼마짜리일까요?`,moneyViz([itemOf(v)],130),won(v),ds);
+      }
+      case 'total':{
+        const items=genItems(lv);const t=total(items);
+        const q=nar?pick([`${nm(n,'i')} 저금통을 열어 보니 이런 돈이 들어 있었어요. 모두 <b>얼마</b>일까요?`,`${nm(n,'i')} 지갑에 이런 돈을 가지고 있어요. 모두 <b>얼마</b>일까요?`]):`돈은 모두 <b>얼마</b>일까요?`;
+        return mk(q,moneyViz(items),won(t),amtDistract(t,items));
+      }
+      case 'howMany':{
+        let items,tries=0;do{items=genItems(Math.max(2,lv));tries++;}while(uniq(items.map(i=>i.v)).length<2&&tries<20);
+        const v=pick(uniq(items.map(i=>i.v)));const c=items.filter(i=>i.v===v).length;
+        const q=nar?`${dispName(n)}의 돈입니다. <b>${won(v)}</b>짜리 ${kname(v)}${josaW(kname(v),'eun')} 모두 몇 ${noun(v)}일까요?`:`<b>${won(v)}</b>짜리 ${kname(v)}${josaW(kname(v),'eun')} 모두 몇 ${noun(v)}일까요?`;
+        return mk(q,moneyViz(items),c+noun(v),[c+1,c-1,c+2,items.length,c+3].filter(x=>x>0).map(x=>x+noun(v)));
+      }
+      case 'exchange':{
+        const EX=[[100,10,10,2],[500,100,5,2],[500,50,10,2],[100,50,2,2],[1000,500,2,4],[1000,100,10,4],[5000,1000,5,5],[10000,5000,2,5],[10000,1000,10,5],[50000,10000,5,6]];
+        const c=pick(EX.filter(e=>e[3]<=lv));const [f,t,k]=c;
+        const id=uid(),W=240;
+        const fs=f>=1000?.5:1.7,ts=t>=1000?.5:1.7;
+        const fw=(f>=1000?BILL[f].w:COIN[f].d)*fs,tw=(t>=1000?BILL[t].w:COIN[t].d)*ts;
+        const fh=(f>=1000?BILL_H:COIN[f].d)*fs,th=(t>=1000?BILL_H:COIN[t].d)*ts;
+        const tot=fw+tw+96;const k0=Math.min(1,(W-6)/tot);let x=3+(W-6-tot*k0)/2;
+        let body=moneyDefs(id);const H=Math.max(fh,th)+10;
+        const put=(v,w,h,s)=>{const o=v>=1000?drawBill(x,(H-h*k0)/2,v,s*k0,id,O().specimen,0):drawCoin(x+w*k0/2,H/2,v,s*k0,id,0);return o;};
+        body+=put(f,fw,fh,fs);x+=fw*k0+10;
+        body+=Tx(x+8,H/2+7,'=',{size:22,weight:800});x+=26;
+        body+=put(t,tw,th,ts);x+=tw*k0+8;
+        body+=Tx(x+6,H/2+6,'×',{size:18,weight:700});x+=18;
+        body+=`<rect x="${r2(x)}" y="${r2(H/2-14)}" width="34" height="28" rx="6" fill="#fff" stroke="#64748b" stroke-width="1.4"/>`+ansG(Tx(r2(x+17),r2(H/2+6),k,{size:17,fill:'#ef4444',weight:900}));
+        const q=nar?`${nm(n,'i')} ${won(f)}짜리 ${kname(f)} 1${noun(f)}${josaW(noun(f),'eul')} ${won(t)}짜리 ${kname(t)}${josaW(kname(t),'ro')} 바꾸려고 해요. <b>몇 ${noun(t)}</b>${noun(t)==='개'?'로':'으로'} 바꿀 수 있을까요?`:`${won(f)}짜리 ${kname(f)} 1${noun(f)}${josaW(noun(f),'eun')} <b>${won(t)}</b>짜리 ${kname(t)} 몇 ${noun(t)}${josaW(noun(t),'wa')} 같을까요?`;
+        return mk(q,svgWrap(W,Math.ceil(H),body),k+noun(t),[k+1,k-1,k*2,k+5,Math.max(1,k-2),k+2].filter(x=>x>0).map(x=>x+noun(t)));
+      }
+      case 'write':{
+        const a=randAmount(lv);const toKo=chance(.5);
+        if(toKo){
+          const q=nar?`${nm(n,'i')} 가게에서 가격표를 봤어요. <b>${won(a)}</b>은 한글로 어떻게 읽을까요?`:`<b>${won(a)}</b>을 한글로 읽어 보세요.`;
+          return mk(q,tagViz(won(a)),koWon(a),numDistract(a).map(koWon));
+        }
+        const q=nar?`${nm(n,'i')} 가게에서 <b>${koWon(a)}</b>이라는 말을 들었어요. 숫자로 쓰면 얼마일까요?`:`<b>${koWon(a)}</b>을 숫자로 쓰세요.`;
+        return mk(q,tagViz(koWon(a)),won(a),numDistract(a).map(won));
+      }
+      case 'compare':{
+        let A,B,ta,tb,t=0;do{A=genItems(Math.min(lv,5),true);B=genItems(Math.min(lv,5),true);ta=total(A);tb=total(B);t++;}while((ta===tb||A.length+B.length>10)&&t<40);
+        if(ta===tb)return null;
+        const ans=ta>tb?'가':'나';
+        const q=nar?`${nm(n,'i')}와 친구의 돈입니다. <b>돈이 더 많은 쪽</b>은 어느 쪽일까요? (가 / 나)`:`<b>돈이 더 많은 쪽</b>은 어느 쪽일까요? (가 / 나)`;
+        const o=mk(q,panelsViz([A,B],['가','나'],165),ans,['가','나','같다','알 수 없다']);
+        o.choices=['가','나','같다','알 수 없다'];o.correctIdx=o.choices.indexOf(ans);
+        return o;
+      }
+      case 'order':{
+        let G,ts,t=0;do{G=[0,1,2].map(()=>genItems(Math.min(lv,5),true));ts=G.map(total);t++;}while((new Set(ts).size<3||sum(G.map(g=>g.length))>11)&&t<60);
+        if(new Set(ts).size<3)return null;
+        const lab=['가','나','다'];const ord=[0,1,2].sort((a,b)=>ts[b]-ts[a]);
+        const ans=ord.map(i=>lab[i]).join(' - ');
+        const perms=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]].map(p=>p.map(i=>lab[i]).join(' - '));
+        return mk(nar?`세 친구의 돈입니다. <b>금액이 많은 순서</b>대로 기호를 쓰세요.`:`<b>금액이 많은 것부터</b> 차례로 기호를 쓰세요.`,panelsViz(G,lab,175),ans,perms.filter(p=>p!==ans));
+      }
+      case 'payGreedy':{
+        const ds=denoms(Math.max(3,Math.min(lv,6)));
+        const cnt={};let amt=0;
+        ds.forEach(d=>{const cap=(d===50000)?2:(d===500||d===5000||d===50)?1:4;const c=chance(.65)?randInt(0,cap):0;cnt[d]=c;amt+=c*d;});
+        if(amt<=0||amt>(lv>=6?150000:99999))return null;
+        const rows=ds.filter(d=>d<=amt).sort((a,b)=>b-a);
+        const id=uid(),W=240,two=rows.length>4,colW=two?120:240,rh=two?36:44;
+        const nr=two?Math.ceil(rows.length/2):rows.length;const cs=two?1.2:1.55,bs=two?.36:.5;
+        let body=moneyDefs(id);
+        rows.forEach((d,i)=>{
+          const col=two?Math.floor(i/nr):0,row=two?i%nr:i;const x0=col*colW+(two?6:46),y0=row*rh+3;
+          if(d>=1000)body+=drawBill(x0,y0+rh*.5-BILL_H*bs/2,d,bs,id,false,0);else body+=drawCoin(x0+COIN[d].d*cs/2,y0+rh/2,d,cs,id,0);
+          const bx=x0+(two?58:78);
+          body+=Tx(bx-9,y0+rh/2+5,'×',{size:14,weight:700});
+          body+=`<rect x="${bx}" y="${y0+rh/2-12}" width="26" height="24" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.2"/>`+ansG(Tx(bx+13,y0+rh/2+6,cnt[d],{size:15,fill:'#ef4444',weight:900}));
+          body+=Tx(bx+36,y0+rh/2+5,noun(d),{size:11,anchor:'start',weight:600,fill:'#475569'});
+        });
+        const ansTxt=rows.filter(d=>cnt[d]>0).map(d=>`${won(d)} ${cnt[d]}${noun(d)}`).join(', ');
+        const q=nar?`${nm(n,'i')} 장난감 가게에서 <b>${won(amt)}</b>을 내려고 해요. <b>큰 돈부터</b> 내면 어떤 돈이 몇 개(장) 필요할까요? 빈칸에 알맞은 수를 쓰세요.`:`<b>${won(amt)}</b>을 <b>큰 돈부터</b> 내려고 합니다. 빈칸에 알맞은 수를 쓰세요.`;
+        return mk(q,svgWrap(W,nr*rh+8,body),ansTxt);
+      }
+      case 'missing':{
+        const items=genItems(Math.min(lv,5),true);const x=total(items);
+        const v=pick(denoms(Math.min(lv,5)).filter(d=>d>=Math.max(10,Math.min(...items.map(i=>i.v)))&&d<=Math.max(100,x)));const k=randInt(1,5);
+        const T=x+k*v;
+        const q=nar?`${nm(n,'i')} 가진 돈입니다. 모두 <b>${won(T)}</b>을 만들려면 ${won(v)}짜리 ${kname(v)}${josaW(kname(v),'i')} <b>몇 ${noun(v)} 더</b> 필요할까요?`:`모두 <b>${won(T)}</b>이 되려면 ${won(v)}짜리 ${kname(v)}${josaW(kname(v),'i')} <b>몇 ${noun(v)} 더</b> 필요할까요?`;
+        return mk(q,moneyViz(items),k+noun(v),[k+1,k-1,k+2,k*2,k+3].filter(z=>z>0).map(z=>z+noun(v)));
+      }
+      case 'fewest':{
+        const ds=denoms(Math.min(lv,6));const a=randAmount(Math.min(lv,6))/(lv<=5?1:1);
+        const amt=lv<=5?Math.max(110,Math.round(a/10)*10):a;
+        const cs=greedy(amt,ds);const c=sum(cs.map(z=>z[1]));
+        const q=nar?`${nm(n,'i')} ${won(amt)}을 내려고 해요. 동전과 지폐를 <b>가장 적게</b> 쓰면 모두 몇 개(장)일까요?`:`<b>${won(amt)}</b>을 동전과 지폐 <b>가장 적은 개수</b>로 만들면 모두 몇 개(장)일까요?`;
+        return mk(q,'',c+'개(장)',[c+1,c-1,c+2,c+3,c-2].filter(z=>z>0).map(z=>z+'개(장)'));
+      }
+      case 'afford':{
+        const items=genItems(Math.min(lv,6));const T=total(items);
+        const unit=T<3000?100:T<20000?500:1000;const can=chance(.5);
+        const k=can?randInt(0,3):randInt(1,3);const P=can?T-k*unit:T+k*unit;
+        if(P<100)return null;
+        const it=itemFor(P);
+        const q=nar?`${nm(n,'i')} 가진 돈입니다. <b>${it}(${won(P)})</b>${josaW(it,'eul')} 살 수 있을까요?`:`가진 돈으로 <b>${it}(${won(P)})</b>${josaW(it,'eul')} 살 수 있을까요?`;
+        const o=mk(q,moneyViz(items,140),can?'살 수 있다':'살 수 없다');
+        o.choices=['살 수 있다','살 수 없다'];o.correctIdx=can?0:1;
+        return o;
+      }
+      case 'short':{
+        const items=genItems(Math.min(lv,6));const T=total(items);
+        const unit=T<3000?100:T<20000?500:1000;const d=randInt(1,4)*unit;const P=T+d;const it=itemFor(P);
+        const q=nar?`${nm(n,'i')} 가진 돈입니다. <b>${it}(${won(P)})</b>${josaW(it,'eul')} 사려면 <b>얼마가 모자랄까요</b>?`:`<b>${it}(${won(P)})</b>${josaW(it,'eul')} 사려면 <b>얼마가 모자랄까요</b>?`;
+        return mk(q,moneyViz(items,140),won(d),[d+unit,Math.max(unit,d-unit),d*2,P,T,d+2*unit].map(won));
+      }
+      case 'change':{
+        const P=randInt(3,99)*100+(chance(.25)?50:0);const pay=payBill(P);
+        const it=itemFor(P);const ch=pay-P;
+        const q=nar?`${nm(n,'i')} ${it}(${won(P)})${josaW(it,'eul')} 사고 아래 돈을 냈어요. <b>거스름돈</b>은 얼마일까요?`:`${it}(${won(P)})${josaW(it,'eul')} 사고 아래 돈을 냈습니다. <b>거스름돈</b>은 얼마일까요?`;
+        return mk(q,moneyViz([itemOf(pay)],110),won(ch),[ch+100,ch-100,ch+500,ch-500,ch+1000,P].filter(z=>z>0).map(won));
+      }
+      case 'buyTwo':{
+        const P1=randInt(2,59)*100,P2=randInt(2,59)*100;const pay=payBill(P1+P2);
+        const i1=itemFor(P1);let i2=itemFor(P2);let tt=0;while(i2===i1&&tt++<20)i2=itemFor(P2);const ch=pay-P1-P2;
+        const q=`${nar?nm(n,'i')+' ':''}${i1}(<b>${won(P1)}</b>), ${i2}(<b>${won(P2)}</b>)${josaW(i2,'eul')} 사고 아래 돈을 냈${nar?'어요':'습니다'}. <b>거스름돈</b>은 얼마일까요?`;
+        return mk(q,moneyViz([itemOf(pay)],110),won(ch),[ch+100,ch-100,ch+200,ch-200,ch+1000,P1+P2].filter(z=>z>0).map(won));
+      }
+    }
+    return null;
+  }
+};
+
+// ───────── 시작 ─────────
+window.regenerateSheet=regenerateSheet;window.toggleAnswers=toggleAnswers;window.printSheet=printSheet;
+window.setPagesDropdown=setPagesDropdown;window.updateQuestionsCount=updateQuestionsCount;window.toggleGroup=toggleGroup;
+function initApp(){initConfig();buildPanel();initDate();if(tryAnswerView())return;setupTypeWeights();regenerateSheet();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initApp);else initApp();
+
+  </script>
+</body>
+</html>

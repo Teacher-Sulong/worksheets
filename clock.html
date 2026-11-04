@@ -1,0 +1,2374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>[수학] 시계보기 맞춤형 학습지 생성기</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- QR Code 생성 (오프라인 캐시 가능) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #f1f5f9;
+    }
+
+    /* 인쇄 시 레이아웃 최적화 */
+    @media print {
+      html, body {
+        background-color: #ffffff !important;
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      main {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+      }
+      #print-pages-container {
+        display: block !important;
+        width: 100% !important;
+      }
+      .print-area {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 6mm !important;
+        box-sizing: border-box !important;
+        box-shadow: none !important;
+        border: none !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        height: 285mm !important;
+        overflow: hidden !important;
+      }
+      .print-area:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+      @page {
+        size: A4;
+        margin: 6mm 6mm 6mm 6mm;
+      }
+    }
+
+    /* 선명한 캔버스 렌더링 */
+    .clock-canvas {
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+    }
+    /* 풀이 공간 깔끔한 회색 바탕 레이아웃 */
+    .math-grid-bg {
+      background-color: #f8fafc;
+    }
+    /* QR로 열린 정답 전용 화면 */
+    body.answer-view #main-header,
+    body.answer-view #option-panel,
+    body.answer-view #print-control-toolbar,
+    body.answer-view footer { display: none !important; }
+    body.answer-view main { display: block; padding: 10px; max-width: 900px; margin: 0 auto; }
+    body.answer-view .print-area { box-shadow: none; border-color: #e2e8f0; }
+    /* 큰 글씨 모드 */
+    .print-area.big-mode .qtext-el { font-size: 14.5px !important; line-height: 1.5 !important; }
+    .print-area.big-mode .answer-box { font-size: 14px !important; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+  <!-- 헤더 (시계보기 맞춤형 생성 플랫폼 헤더와 완전 일치) -->
+  <header id="main-header" class="bg-sky-600 text-white shadow-md py-4 px-6 no-print">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <i data-lucide="clock" class="w-8 h-8 text-yellow-300 animate-pulse"></i>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">[수학] 시계보기 맞춤형 학습지 생성기</h1>
+          <p class="text-xs text-sky-200">초등 수학 교육과정 기반 맞춤형 문제 자동 생성 플랫폼 · <b class="text-yellow-200">made by 특수교사 슬옹쌤</b></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-sm text-sky-100 bg-sky-700 px-3 py-1.5 rounded-lg">
+        <i data-lucide="info" class="w-4 h-4"></i>
+        <span>정확한 인쇄를 위해 <b>[배경 그래픽 인쇄]</b> 옵션을 켜주세요.</span>
+      </div>
+    </div>
+  </header>
+  <!-- 메인 레이아웃 -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-6">
+
+    <!-- 왼쪽: 제어 옵션 패널 (no-print) -->
+    <section id="option-panel" class="w-full md:w-96 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 shrink-0 self-start no-print">
+      <div class="flex items-center gap-2 pb-4 border-b border-slate-100">
+        <i data-lucide="sliders" class="w-5 h-5 text-sky-600"></i>
+        <h2 class="text-lg font-bold text-slate-950">학습지 형성 옵션</h2>
+      </div>
+      <!-- 1. 페이지 및 문제 수 설정 -->
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">인쇄 페이지 수 (최대 10장)</label>
+        <select id="sheet-pages" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none font-medium" onchange="setPagesDropdown(this.value)">
+          <option value="1">1장 생성</option>
+          <option value="2" selected>2장 생성</option>
+          <option value="3">3장 생성</option>
+          <option value="4">4장 생성</option>
+          <option value="5">5장 생성</option>
+          <option value="6">6장 생성</option>
+          <option value="7">7장 생성</option>
+          <option value="8">8장 생성</option>
+          <option value="9">9장 생성</option>
+          <option value="10">10장 대량 생성</option>
+        </select>
+        <p class="text-xs text-slate-400">각 페이지당 최대 9개의 문제가 포함됩니다.</p>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700 flex justify-between">
+          <span>페이지당 문제 수</span>
+          <span id="num-of-questions-val" class="text-sky-600 font-bold">9개</span>
+        </label>
+        <input type="range" id="questions-count" min="1" max="9" value="9" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600" oninput="updateQuestionsCount(this.value)">
+        <div class="flex justify-between text-[10px] text-slate-400">
+          <span>1개</span>
+          <span>3개 (1줄)</span>
+          <span>6개 (2줄)</span>
+          <span>9개 (3줄)</span>
+        </div>
+      </div>
+      <!-- 2. 난이도 선택 -->
+      <div class="space-y-3">
+        <label for="difficulty" class="block text-sm font-semibold text-slate-700">시계 난이도 세부 설정</label>
+        <select id="difficulty" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none" onchange="regenerateSheet()">
+          <option value="1h">1단계 (1시간 단위)</option>
+          <option value="30m">2단계 (30분 단위)</option>
+          <option value="20m">3단계 (20분 단위)</option>
+          <option value="15m">4단계 (15분 단위)</option>
+          <option value="10m">5단계 (10분 단위)</option>
+          <option value="5m">6단계 (5분 단위)</option>
+          <option value="1m" selected>7단계 (1분 단위)</option>
+          <option value="1s">8단계 (초 단위)</option>
+          <option value="9hms">9단계 (시/분/초 모두 포함)</option>
+        </select>
+      </div>
+      <!-- 2-1. 난이도 배치 -->
+      <div class="space-y-3">
+        <label for="progression" class="block text-sm font-semibold text-slate-700">난이도 배치 방식</label>
+        <select id="progression" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none" onchange="regenerateSheet()">
+          <option value="single" selected>단일 (선택한 단계로 고정)</option>
+          <option value="asc">쉬움 → 어려움 (오름차순)</option>
+          <option value="desc">어려움 → 쉬움 (내림차순)</option>
+          <option value="mix">혼합 (무작위 섞기)</option>
+        </select>
+        <p class="text-xs text-slate-400">단일이 아니면 위에서 고른 '시계 난이도 세부 설정' 단계를 <b>최고 난이도</b>로 보고 1단계부터 분배합니다.</p>
+      </div>
+      <!-- 2-2. 세부 옵션 설정 -->
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">세부 옵션 설정 <span class="text-[11px] font-normal text-slate-400">(표기·시계 표시 방식)</span></label>
+      <div class="space-y-2 bg-slate-50 border border-slate-100 rounded-lg p-3">
+        <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" id="opt-digital24" class="w-4 h-4 text-sky-600 rounded" onchange="regenerateSheet()">
+          <span>디지털 시계를 <b>24시간제</b>로 표기</span>
+        </label>
+        <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" id="opt-korean" class="w-4 h-4 text-sky-600 rounded" onchange="regenerateSheet()">
+          <span><b>한글 시각 표기 병행</b> (예 → 세 시 이십 분)</span>
+        </label>
+        <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" id="opt-big" class="w-4 h-4 text-sky-600 rounded" onchange="regenerateSheet()">
+          <span><b>큰 글씨·큰 시계</b> <span class="text-[10px] text-sky-600 font-semibold">(적정 6문제 추천)</span></span>
+        </label>
+        <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" id="opt-nonumber" class="w-4 h-4 text-sky-600 rounded" onchange="regenerateSheet()">
+          <span>시계에 <b>숫자 없이</b> 표시</span>
+        </label>
+        <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" id="opt-mintick" class="w-4 h-4 text-sky-600 rounded" checked onchange="regenerateSheet()">
+          <span>시계에 <b>1분 단위 눈금</b> 표시</span>
+        </label>
+        <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" id="opt-boldkey" class="w-4 h-4 text-sky-600 rounded" checked onchange="regenerateSheet()">
+          <span>문제의 <b>중요 부분 볼드 처리</b></span>
+        </label>
+      </div>
+      </div>
+      <!-- 3. 시계 형식 선택 -->
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">시계 표현 방식</label>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="cursor-pointer border border-slate-200 rounded-lg p-2 flex flex-col items-center gap-1 bg-white hover:bg-slate-50 [&:has(input:checked)]:border-sky-500 [&:has(input:checked)]:bg-sky-50">
+            <input type="radio" name="clock-type" value="analog" class="sr-only" onchange="regenerateSheet()">
+            <span class="text-xs font-semibold">아날로그</span>
+          </label>
+          <label class="cursor-pointer border border-slate-200 rounded-lg p-2 flex flex-col items-center gap-1 bg-white hover:bg-slate-50 [&:has(input:checked)]:border-sky-500 [&:has(input:checked)]:bg-sky-50">
+            <input type="radio" name="clock-type" value="digital" class="sr-only" onchange="regenerateSheet()">
+            <span class="text-xs font-semibold">디지털</span>
+          </label>
+          <label class="cursor-pointer border border-slate-200 rounded-lg p-2 flex flex-col items-center gap-1 bg-white hover:bg-slate-50 [&:has(input:checked)]:border-sky-500 [&:has(input:checked)]:bg-sky-50">
+            <input type="radio" name="clock-type" value="mixed" class="sr-only" checked onchange="regenerateSheet()">
+            <span class="text-xs font-semibold">혼합 제공</span>
+          </label>
+        </div>
+      </div>
+      <!-- 4. 문제 스타일 -->
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">문제 문항 방식 (중복 선택)</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" id="style-subjective" checked class="w-4 h-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500" onchange="regenerateSheet()">
+            <span>주관식 (일반 서술형)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" id="style-objective" checked class="w-4 h-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500" onchange="regenerateSheet()">
+            <span>객관식 (4지 선다형)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" id="style-narrative" checked class="w-4 h-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500" onchange="regenerateSheet()">
+            <span>문장제 (실생활 맥락 시나리오)</span>
+          </label>
+        </div>
+      </div>
+      <!-- 5. 문제 세부 유형 -->
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">수학 문제 세부 유형</label>
+        <p class="text-[11px] text-slate-400 leading-relaxed">각 항목 오른쪽 숫자(1~5)로 <b>출제 비중</b>을, 영역 제목 옆 <b>전체</b> 체크로 해당 영역을 한 번에 켜고 끌 수 있어요.</p>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">시각 읽기·표현</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-checkbox w-3.5 h-3.5 text-sky-600 rounded" data-group="read" checked onchange="onGroupToggle(this)">전체</label></div>
+        <div class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="read" data-group="read" checked onchange="onTypeToggle(this)"><span>시계 보고 시각 읽기</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="draw" data-group="read" checked onchange="onTypeToggle(this)"><span>시각 보고 바늘 그리기 / 디지털 매칭</span></label>
+        </div>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">시각 계산·비교</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-checkbox w-3.5 h-3.5 text-sky-600 rounded" data-group="calc" checked onchange="onGroupToggle(this)">전체</label></div>
+        <div class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="calc" data-group="calc" checked onchange="onTypeToggle(this)"><span>시각 더하기 / 빼기 계산</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="compare" data-group="calc" checked onchange="onTypeToggle(this)"><span>시각 비교·순서 나열</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="before" data-group="calc" checked onchange="onTypeToggle(this)"><span>몇 시 몇 분 전</span></label>
+        </div>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">시간 단위·변환</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-checkbox w-3.5 h-3.5 text-sky-600 rounded" data-group="unit" checked onchange="onGroupToggle(this)">전체</label></div>
+        <div class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="toMin" data-group="unit" checked onchange="onTypeToggle(this)"><span>시간을 분(초)으로 변환</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="toHour" data-group="unit" checked onchange="onTypeToggle(this)"><span>분을 시간(분)으로 변환</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="unitRel" data-group="unit" checked onchange="onTypeToggle(this)"><span>시간 단위 관계 (분·시간·일)</span></label>
+        </div>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">경과 시간</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-checkbox w-3.5 h-3.5 text-sky-600 rounded" data-group="dur" checked onchange="onGroupToggle(this)">전체</label></div>
+        <div class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="duration" data-group="dur" checked onchange="onTypeToggle(this)"><span>경과한 시간 (오전·오후 넘김 없음)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="durationCross" data-group="dur" checked onchange="onTypeToggle(this)"><span>경과한 시간 (오전·오후 넘김)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="durationVcalc" data-group="dur" checked onchange="onTypeToggle(this)"><span>경과 시간 세로셈으로 계산</span></label>
+        </div>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">생활 속 시간</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-checkbox w-3.5 h-3.5 text-sky-600 rounded" data-group="life" checked onchange="onGroupToggle(this)">전체</label></div>
+        <div class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="h24" data-group="life" checked onchange="onTypeToggle(this)"><span>오전·오후 판단 및 24시간제 변환</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="schedule" data-group="life" checked onchange="onTypeToggle(this)"><span>시간표(일과표) 읽기</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-sky-600 rounded" value="timetable" data-group="life" checked onchange="onTypeToggle(this)"><span>버스·기차 시간표 읽기</span></label>
+        </div>
+      </div>
+      <!-- 동작 버튼 (시계 학습지 포맷과 완벽 동일화) -->
+      <div class="pt-4 border-t border-slate-100 flex flex-col gap-2">
+        <button onclick="regenerateSheet()" class="w-full bg-slate-900 text-white font-bold py-3 px-4 rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          새로운 문제 생성하기
+        </button>
+        <button onclick="toggleAnswers()" id="toggle-ans-btn" class="w-full bg-sky-50 border border-sky-200 text-sky-600 font-semibold py-2.5 px-4 rounded-xl hover:bg-sky-100 transition flex items-center justify-center gap-2">
+          <i data-lucide="eye" id="eye-icon" class="w-4 h-4"></i>
+          <span id="ans-text">답안 정답 보이기</span>
+        </button>
+      </div>
+    </section>
+    <!-- 오른쪽: 실시간 학습지 뷰어 -->
+    <section class="flex-1 flex flex-col gap-6">
+
+      <!-- 도구 창 (인쇄 버튼) -->
+      <div id="print-control-toolbar" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center no-print">
+        <span class="text-sm font-medium text-slate-500">
+          실시간 학습지 미리보기
+        </span>
+        <div class="flex gap-2">
+          <select id="qr-mode" title="QR에 무엇을 담을지" onchange="QR_MODE=this.value;makeQRCodes();" class="ml-auto mr-2 rounded-lg border border-slate-200 px-2 py-2 text-xs bg-white font-semibold text-slate-600"><option value="link">QR: 정답지 페이지 열기</option><option value="text">QR: 정답 글자 (로그인 불필요)</option></select>
+          <button onclick="printSheet()" class="bg-sky-600 hover:bg-sky-700 text-white font-bold px-5 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md">
+            <i data-lucide="printer" class="w-5 h-5"></i>
+            인쇄 및 PDF 저장
+          </button>
+        </div>
+      </div>
+      <!-- 실제 시험지 영역 -->
+      <div id="print-pages-container" class="space-y-6">
+        <!-- 동적으로 페이지가 삽입됩니다. -->
+      </div>
+    </section>
+  </main>
+  <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs mt-12 no-print border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 space-y-2">
+      <p>본 학습지 생성기에 사용된 시계 바늘 모델 및 문항 시나리오는 초등 교과 과정을 준수합니다.</p>
+      <p>© 2026 시계보기 맞춤형 학습지 · <b class="text-slate-200">made by 특수교사 슬옹쌤</b></p>
+    </div>
+  </footer>
+  <script>
+    // ── QR 정답지 설정: 스캔하면 이 생성기의 정답지 화면이 바로 열려요 ──
+    const ANSWER_URL = 'https://teacher-sulong.github.io/worksheets/clock.html';
+    let QR_MODE = 'link';
+    // 정답지 화면: 휴대폰 화면 폭에 학습지 한 장이 통째로 보이도록 맞춤
+    function fitAnswerView(){ if(!document.body.classList.contains('answer-view'))return; var c=document.getElementById('print-pages-container'); if(!c)return; c.style.zoom=Math.min(1,(window.innerWidth-12)/850); }
+    window.addEventListener('resize', fitAnswerView);
+    window.addEventListener('hashchange', function () { if (/^#k[-=]/.test(location.hash)) location.reload(); });
+    // ───────────────────────── 시드 기반 난수 (QR 재현용) ─────────────────────────
+    function mulberry32(a) {
+      return function () {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    let rng = Math.random; // 기본은 비결정적, 페이지 생성 시 시드로 교체
+
+    // 상태값 관리
+    let config = {
+      pages: 2,
+      questionsPerPage: 9,
+      difficulty: '1m',         // 드롭다운에서 고른 (최고) 난이도 — 7단계
+      baseDifficulty: '1m',
+      clockType: 'mixed',       // analog, digital, mixed
+      styles: ['subjective', 'objective', 'narrative'],
+      types: ['read', 'draw', 'calc', 'compare', 'before', 'toMin', 'toHour', 'unitRel', 'duration', 'durationCross', 'durationVcalc', 'h24', 'schedule', 'timetable'],
+      dateStr: '',
+      progression: 'single',    // single | asc | desc | mix  (난이도 배치)
+      digital24: false,         // 디지털 시계 24시간제 표기
+      koreanTime: false,        // 한글 시각 표기(세 시 이십 분)
+      bigMode: false,           // 큰 글씨·큰 시계
+      clockNoNumbers: false,    // 숫자 없는 시계
+      clockMinuteTicks: true,   // 1분 단위 눈금선 표시
+      boldKey: true,            // 중요 부분 볼드 강조(끄면 균일 텍스트)
+      typeWeights: {},          // 유형별 출제 비중
+      answerUrl: ''             // QR가 가리킬 배포(호스팅) 주소
+    };
+    const DIFFS = ['1h', '30m', '20m', '15m', '10m', '5m', '1m', '1s', '9hms'];
+    let generatedPages = []; // 페이지별 문제 정보 배열
+    let pageSeeds = [];      // 페이지별 시드 (QR 재현용)
+    let showAnswers = false; // 답안 보기 여부
+    let answerViewMode = false; // QR로 열린 정답 전용 화면 여부
+    const KOREAN_TYPES = {
+      read: '시각 읽기',
+      draw: '바늘 그리기',
+      calc: '시각 연산',
+      toMin: '시간을 분으로',
+      toHour: '분을 시간으로',
+      duration: '경과한 시간 (넘김 없음)',
+      durationCross: '경과한 시간 (오전·오후 넘김)',
+      durationVcalc: '경과 시간 세로셈',
+      unitRel: '단위 관계',
+      h24: '오전·오후/24시간제',
+      compare: '시각 비교·순서 나열',
+      before: '몇 시 몇 분 전',
+      schedule: '시간표 읽기',
+      timetable: '교통 시간표'
+    };
+    const KOREAN_STYLES = {
+      subjective: '주관식',
+      objective: '객관식',
+      narrative: '문장제'
+    };
+    // [최적화된 문장제 시나리오 데이터베이스]
+    const SCENARIOS = {
+      read: [
+        "{name}{josaEun} 아침에 기지개를 켜고 눈을 떠 침대 옆 탁상의 동그란 시계를 보았습니다.",
+        "{name}{josaI} 학교 급식실 입구에서 맛있는 냄새를 맡으며 시계를 올려다보았습니다.",
+        "{name}{josaEun} 하교 후 줄넘기 연습을 하다가 손목밴드 시계를 슬쩍 확인했습니다.",
+        "{name}{josaI} 도서실 창가 자리에 앉아 재미있는 우주 과학 동화책을 다 읽고 시계를 보았습니다.",
+        "{name}{josaEun} 친구네 집 마당에서 흙장난을 하며 신나게 성을 쌓다가 문득 시계를 보았습니다.",
+        "{name}{josaI} 오븐에서 노릇노릇하게 구워진 초코 쿠키를 꺼내며 시계를 흘끗 응시했습니다.",
+        "{name}{josaEun} 일기장에 오늘 있었던 그림일기를 모두 다 적은 뒤 시계를 슬그머니 보았습니다.",
+        "수영장에서 왕복 25m 물장구 연습을 마치고 숨을 고르던 {name}{josaI} 벽시계를 보았습니다.",
+        "{name}{josaEun} 방과 후 미술 시간에 알록달록한 찰흙 점토 공룡을 다 완성하고 벽면 시계를 보았습니다.",
+        "{name}{josaI} 음악 교실에서 신나게 리코더 연습을 마친 후 탁자 위 시계를 응시했습니다."
+      ],
+      draw: [
+        "엄마{josaEun} <b>[ {timeStr} ]</b>에 달콤한 초코 머핀을 오븐에서 꺼내시려고 합니다.",
+        "{name}{josaEun} 매일 저녁 <b>[ {timeStr} ]</b>에 동화책 한 단원을 크게 소리 내어 읽습니다.",
+        "{name}{josaI} 제일 좋아하는 미술 그리기 소모임실에 들어가기 시작하는 시각은 <b>[ {timeStr} ]</b>입니다.",
+        "방과 후 학교에서 서예 쓰기 강습이 정식으로 시작되는 시간은 <b>[ {timeStr} ]</b>입니다.",
+        "{name}{josaI} 삼촌과 함께 공원에서 자전거를 타기로 약속한 시간은 정확히 <b>[ {timeStr} ]</b>입니다.",
+        "구민 어린이 도서관에서 진행하는 가을 독서 구연 동화 교실의 시작 시각은 <b>[ {timeStr} ]</b>입니다.",
+        "선생님이 내일 오전 교실에서 준비물 가위 사용법 안전 교육을 하실 시각은 <b>[ {timeStr} ]</b>입니다.",
+        "학교 정문 옆 화단에 예쁜 튤립과 수선화 꽃 모종을 심기 시작하는 시각은 <b>[ {timeStr} ]</b>입니다.",
+        "{name}{josaI} 애완묘 나비에게 영양제 사료를 식기에 골고루 챙겨주는 약속 시간은 <b>[ {timeStr} ]</b>입니다.",
+        "{name}{josaEun} 큐브 6면을 완전히 다 맞추고 기쁨의 하이파이브를 한 타이머 시각이 <b>[ {timeStr} ]</b>였습니다."
+      ],
+      calc: [
+        "{name}{josaEun} 피아노 건반 곡 연습을 시작할 때가 <b>{startHour}시 {startMin}분{startSec}</b>이었습니다. 집중해서 <b>{offsetStr} 동안</b> 연습을 더 했다면 연습을 마친 시각은 언제입니까?",
+        "{name}{josaI} 도서관 책상에 앉은 시각은 <b>{startHour}시 {startMin}분{startSec}</b>입니다. 책을 읽기 전에 마음을 차분히 가다듬는 정리 활동을 <b>{offsetStr} 전에</b> 했다면 정리를 시작한 시각은 언제입니까?",
+        "{name}{josaEun} 종이접기로 빨간색 소방차를 다 접고 시계를 보니 <b>{startHour}시 {startMin}분{startSec}</b>이었습니다. 이보다 정확히 <b>{offsetStr} 전에</b> 종이접기를 시작했다면 시작 시각은 언제입니까?",
+        "학교 방과 후 수묵화 그리기 교실이 끝나는 시각은 <b>{startHour}시 {startMin}분{startSec}</b>입니다. 정리를 위해 강습이 끝나고 <b>{offsetStr} 후에</b> 교실을 나섰다면 교실을 나선 시각은 언제입니까?",
+        "{name}{josaI} 삼촌과 자전거 주행 연습을 하기로 약속한 시각은 <b>{startHour}시 {startMin}분{startSec}</b>입니다. 약속 시간에 늦지 않도록 <b>{offsetStr} 전에</b> 공원에 도착했다면 공원에 도착한 시각은 언제입니까?",
+        "선생님이 내일 오전 학교 횡단보도 신호 대기 안전 교육을 소집하신 시각은 <b>{startHour}시 {startMin}분{startSec}</b>입니다. 교육이 시작되고 <b>{offsetStr} 후에</b> 퀴즈 대회가 있다면 퀴즈 대회의 시각은 언제입니까?",
+        "학교 정문 우측 미니 온실 정원에 예쁜 수선화 꽃 모종 심기가 완료된 시각은 <b>{startHour}시 {startMin}분{startSec}</b>입니다. 모종을 심기 시작한 것은 이보다 <b>{offsetStr} 전</b>이라면 모종 심기를 시작한 시각은 언제입니까?"
+      ],
+      toMin: [
+        "{name}{josaI} 미니 제트기 장난감 모델을 조립하는 데 <b>{val}</b>{valIGa} 걸렸습니다. 장난감 조립 시간은 {questionUnit}",
+        "{name}{josaEun} 주말 자전거 트랙 연속 완주 주행을 하는 데 <b>{val}</b>{valIGa} 걸렸습니다. 이것은 {questionUnit}",
+        "{name}{josaEun} 받아쓰기 시험 급수판의 10문제를 꼼꼼히 채우는 데 <b>{val}</b>{valIGa} 소요되었습니다. 시험을 본 시간은 {questionUnit}",
+        "{name}{josaEun} 루빅스 큐브의 흐트러진 정렬 면을 모두 제 위치로 조율하는 데 <b>{val}</b>{valIGa} 소요되었습니다. 이것은 {questionUnit}",
+        "{name}{josaEun} 부모님과 함께 할머니 댁으로 향해 마을버스를 타고 간 시간이 <b>{val}</b>{valCopula}습니다. 버스를 타고 간 시간은 {questionUnit}",
+        "{name}{josaEun} 주말 미술 숙제로 가족 얼굴 그림을 정성껏 오리고 붙여 완성하는 데 <b>{val}</b>{valEulReul} 썼습니다. 숙제에 걸린 시간은 {questionUnit}"
+      ],
+      toHour: [
+        "{name}{josaI} 스마트폰 보조 타이머의 최신 펌웨어 다운로드 기록 장치에서 <b>{val}</b>{valEulReul} 읽었습니다. 이것은 {questionUnit}",
+        "{name}{josaEun} 소묘 미술 화실 실기 연습에서 예쁜 가을 나무 그림을 다 그리는 데 총 <b>{val}</b>{valEulReul} 보냈습니다. 소요 시간은 {questionUnit}",
+        "{name}{josaEun} 수묵 풍경화 그리기 예선 출전 독창곡 음원을 음반용으로 정밀 녹음한 기록 장치를 보니 <b>{val}</b>{valCopula}습니다. 이것은 {questionUnit}",
+        "{name}{josaEun} 창의력 퍼즐 조립용 미니 블록 상자를 정성껏 맞추어 모두 완성하는 데 <b>{val}</b>{valIGa} 소요되었습니다. {questionUnit}",
+        "{name}{josaEun} 반려견에게 영양 사료를 챙겨주고 가볍게 발톱을 정리해 준 전체 위생 가꾸기 시간으로 총 <b>{val}</b>{valEulReul} 보냈습니다. {questionUnit}"
+      ],
+      ampm: [], 
+      duration: [
+        "오전 <b>{start}</b>에 기차를 타서 책을 읽다 내린 순간의 시각은 오전 <b>{end}</b>{endCopula}습니다. 기차를 타고 간 경과한 시간은 {durUnit}",
+        "{name}{josaI} <b>{start}</b>에 오븐의 가열 예열 코드를 올린 다음 빵 가공 작업을 시작했습니다. 오븐이 멈춘 시각은 <b>{end}</b>일 때, 오븐이 작동하여 경과한 시간은 {durUnit}",
+        "{name}{josaEun} <b>{start}</b>에 노트북 컴퓨터 전원을 켜 소프트웨어 백업 작업을 시작했고, 안전 복원이 완료된 시각은 <b>{end}</b>{endCopula}습니다. 백업에 걸린 경과한 시간은 {durUnit}",
+        "{name}{josaEun} <b>{start}</b>에 수영 연습장에서 자유형 기록을 잴 때 출발 버저가 울렸습니다. 완주 터치패드를 찍은 시각이 <b>{end}</b>{endCopula}다면 수영 연습을 한 경과한 시간은 {durUnit}",
+        "{name}{josaI} 스마트 코딩 무선 프로그래밍 패치를 로봇 교구 블록에 주입하기 시작한 시각이 <b>{start}</b>{startCopula}습니다. 연동 완료 신호음이 들린 시각이 <b>{end}</b>라면 소요된 경과한 시간은 {durUnit}"
+      ],
+      h24: [
+        "기차 출발 안내 전광판에 출발 시각 <b>{shown}</b>{shownJosa} 표시되어 있습니다. 이 시각을 {convertTo}",
+        "{name}{josaEun} 박물관 관람 예약표에서 입장 시각 <b>{shown}</b>{shownJosa} 적힌 것을 확인했습니다. 이 시각을 {convertTo}",
+        "공항 전광판에 비행기 탑승 시각 <b>{shown}</b>{shownJosa} 적혀 있습니다. 이 시각을 {convertTo}"
+      ]
+    };
+    // 시간 단위 관계 문장제 풀 — 가정·학교에서 흔히 겪는 익숙한 상황(한 페이지 9문제가 서로 다르도록 충분히 마련)
+    const UNITREL_SITS = {
+      none: [
+        { u1: '시간', f: 60, u2: '분', n: [1, 4], sit: "{name}{josaEun} 주말에 가족과 보드게임을 모두 <b>{q}</b> 했습니다. 보드게임을 한 시간은 {questionUnit}" },
+        { u1: '시간', f: 60, u2: '분', n: [1, 3], sit: "{name}{josaI} 학교 도서관에서 책을 읽은 시간이 모두 <b>{q}</b>입니다. 이것은 {questionUnit}" },
+        { u1: '시간', f: 60, u2: '분', n: [1, 3], sit: "{name}{josaEun} 방과 후 피아노를 <b>{q}</b> 동안 연습했습니다. 연습한 시간은 {questionUnit}" },
+        { u1: '일', f: 24, u2: '시간', n: [1, 4], sit: "{name}{josaEun} 할머니 댁에서 <b>{q}</b> 동안 지냈습니다. 이 기간은 {questionUnit}" },
+        { u1: '일', f: 24, u2: '시간', n: [1, 3], sit: "우리 반 친구들이 학교 텃밭에서 상추를 <b>{q}</b> 동안 길렀습니다. 이 기간은 {questionUnit}" },
+        { u1: '일', f: 24, u2: '시간', n: [1, 3], sit: "{name}{josaI} 과학 체험 캠프에 <b>{q}</b> 동안 참가했습니다. 이 기간은 {questionUnit}" }
+      ],
+      l8: [
+        { u1: '분', f: 60, u2: '초', n: [1, 5], sit: "{name}{josaEun} 아침마다 이를 닦는 데 <b>{q}</b>{qIGa} 걸립니다. 이 시간은 {questionUnit}" },
+        { u1: '분', f: 60, u2: '초', n: [1, 5], sit: "{name}{josaI} 우유 한 팩을 다 마시는 데 <b>{q}</b>{qIGa} 걸렸습니다. 이 시간은 {questionUnit}" },
+        { u1: '분', f: 60, u2: '초', n: [1, 4], sit: "{name}{josaEun} 사물함을 정리하는 데 <b>{q}</b>{qIGa} 걸렸습니다. 이 시간은 {questionUnit}" },
+        { u1: '분', f: 60, u2: '초', n: [1, 4], sit: "{name}{josaI} 줄넘기를 쉬지 않고 <b>{q}</b> 동안 했습니다. 이 시간은 {questionUnit}" },
+        { u1: '시간', f: 60, u2: '분', n: [1, 3], sit: "{name}{josaEun} 동화책 한 권을 <b>{q}</b> 동안 읽었습니다. 이 시간은 {questionUnit}" },
+        { u1: '시간', f: 60, u2: '분', n: [1, 3], sit: "{name}{josaI} 블록으로 큰 성을 만드는 데 <b>{q}</b>{qIGa} 걸렸습니다. 이 시간은 {questionUnit}" },
+        { u1: '일', f: 24, u2: '시간', n: [1, 3], sit: "{name}{josaEun} 가족 여행으로 <b>{q}</b> 동안 바닷가에 다녀왔습니다. 이 기간은 {questionUnit}" },
+        { u1: '일', f: 24, u2: '시간', n: [1, 3], sit: "{name}{josaI} 학교 미술 작품 전시를 <b>{q}</b> 동안 준비했습니다. 이 기간은 {questionUnit}" }
+      ],
+      l9: [
+        { type: 'hm_to_min', sit: "{name}{josaEun} 과학 실험 관찰을 모두 <b>{q}</b> 동안 했습니다. 이 시간은 {questionUnit}" },
+        { type: 'hm_to_min', sit: "{name}{josaI} 가족과 영화 한 편을 <b>{q}</b> 동안 보았습니다. 이 시간은 {questionUnit}" },
+        { type: 'hms_to_sec', sit: "{name}{josaEun} 운동장에서 달리기 연습을 <b>{q}</b> 동안 했습니다. 이 시간은 {questionUnit}" },
+        { type: 'hms_to_sec', sit: "{name}{josaI} 종이접기 작품을 만드는 데 <b>{q}</b>{qIGa} 걸렸습니다. 이 시간은 {questionUnit}" },
+        { type: 'dh_to_hour', sit: "{name}{josaEun} 시골 친척 집에서 <b>{q}</b> 동안 머물렀습니다. 이 기간은 {questionUnit}" },
+        { type: 'dh_to_hour', sit: "우리 반에서 강낭콩 기르기 관찰을 <b>{q}</b> 동안 했습니다. 이 기간은 {questionUnit}" }
+      ]
+    };
+    // ───────────────────────── 조사 처리 ─────────────────────────
+    function hasBatchim(name) {
+      if (!name || name.length === 0) return false;
+      const lastCode = name.charCodeAt(name.length - 1);
+      if (lastCode < 0xac00 || lastCode > 0xd7a3) return false;
+      return (lastCode - 0xac00) % 28 > 0;
+    }
+    function getDisplayName(name) {
+      return name + (hasBatchim(name) ? '이' : '');
+    }
+    function selectJosa(name, type) {
+      const base = getDisplayName(name);
+      return josaForWord(base, type);
+    }
+    // 임의 단어(시각·분·초 등)의 받침에 맞는 조사를 반환
+    function josaForWord(word, type) {
+      const batchim = hasBatchim(word);
+      if (type === 'eun_neun') return batchim ? '은' : '는';
+      if (type === 'i_ga') return batchim ? '이' : '가';
+      if (type === 'eul_reul') return batchim ? '을' : '를';
+      if (type === 'wa_gwa') return batchim ? '과' : '와';
+      if (type === 'copula') return batchim ? '이었' : '였'; // 이었습니다 / 였습니다
+      return '';
+    }
+    // ───────────────────────── 시간 포맷 유틸 ─────────────────────────
+    function stepFor(diff) {
+      const m = {'1h':60,'30m':30,'20m':20,'15m':15,'10m':10,'5m':5,'1m':1,'1s':1,'9hms':1};
+      return m[diff] || 5;
+    }
+    function pickMinuteByStep(diff) {
+      const s = stepFor(diff);
+      if (s >= 60) return 0;
+      const count = Math.floor(60 / s);
+      return Math.floor(rng() * count) * s;
+    }
+    // 경과/소요 시간을 "X시간 Y분 Z초" 형태로
+    function formatDuration(totalSec) {
+      let h = Math.floor(totalSec / 3600), r = totalSec % 3600, m = Math.floor(r / 60), s = r % 60, p = [];
+      if (h > 0) p.push(h + '시간');
+      if (m > 0) p.push(m + '분');
+      if (s > 0) p.push(s + '초');
+      if (p.length === 0) p.push('0분');
+      return p.join(' ');
+    }
+    function formatHourMin(totalMin) {
+      let h = Math.floor(totalMin / 60), m = totalMin % 60, p = [];
+      if (h > 0) p.push(h + '시간');
+      if (m > 0) p.push(m + '분');
+      if (p.length === 0) p.push('0분');
+      return p.join(' ');
+    }
+    function formatMinSec(totalSec) {
+      let m = Math.floor(totalSec / 60), s = totalSec % 60, p = [];
+      if (m > 0) p.push(m + '분');
+      if (s > 0) p.push(s + '초');
+      if (p.length === 0) p.push('0초');
+      return p.join(' ');
+    }
+    // 12시간 시계 환산 ("X시 Y분 [Z초]")
+    function formatClockTime(totalSec, hasSeconds) {
+      totalSec = ((totalSec % 43200) + 43200) % 43200;
+      let h = Math.floor(totalSec / 3600), r = totalSec % 3600, m = Math.floor(r / 60), s = r % 60;
+      if (h === 0) h = 12;
+      return hasSeconds ? `${h}시 ${m}분 ${s}초` : `${h}시 ${m}분`;
+    }
+    // 난이도에 맞는 더하기/빼기 오프셋(분)
+    function pickOffsetMinutes(diff) {
+      const s = stepFor(diff);
+      const step = s < 5 ? 5 : s;
+      const maxMult = step >= 60 ? 3 : Math.min(8, Math.floor(150 / step));
+      const k = Math.floor(rng() * maxMult) + 1;
+      return step * k;
+    }
+    function randInt(a, b) { return Math.floor(rng() * (b - a + 1)) + a; }
+    // 초 관련 난이도 모드: 'none'(1~7단계) / 'l8'(8단계: 분·초) / 'l9'(9단계: 시·분·초)
+    function secMode() {
+      if (config.difficulty === '9hms') return 'l9';
+      if (config.difficulty === '1s') return 'l8';
+      return 'none';
+    }
+    // ───────────────────────── 공통 유틸 ─────────────────────────
+    function tryCreateIcons() {
+      try {
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+          lucide.createIcons();
+        }
+      } catch (e) {
+        console.warn("Lucide icons loading skipped:", e);
+      }
+    }
+    function initDate() {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const date = String(today.getDate()).padStart(2, '0');
+      config.dateStr = `${year}년 ${month}월 ${date}일`;
+    }
+    function setPagesDropdown(val) {
+      config.pages = parseInt(val);
+      regenerateSheet();
+    }
+    function updateQuestionsCount(val) {
+      const label = document.getElementById('num-of-questions-val');
+      if (label) {
+        label.innerText = val + '개';
+      }
+      config.questionsPerPage = parseInt(val);
+      regenerateSheet();
+    }
+    function toggleAnswers() {
+      showAnswers = !showAnswers;
+      const ansText = document.getElementById('ans-text');
+      const eyeIcon = document.getElementById('eye-icon');
+
+      if (showAnswers) {
+        if (ansText) ansText.innerText = "답안 정답 숨기기";
+        if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
+        document.querySelectorAll('.answer-box').forEach(el => {
+          el.classList.remove('invisible', 'opacity-0');
+          el.classList.add('visible', 'opacity-100');
+        });
+      } else {
+        if (ansText) ansText.innerText = "답안 정답 보이기";
+        if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye');
+        document.querySelectorAll('.answer-box').forEach(el => {
+          el.classList.add('invisible', 'opacity-0');
+          el.classList.remove('visible', 'opacity-100');
+        });
+      }
+      tryCreateIcons();
+      renderAllPageClocks();
+    }
+    function getGradeLevel(diff, type) {
+      if (type === 'h24') return "초등 3학년";
+      if (type === 'unitRel') return "초등 2학년";
+      if (['1s', '9hms'].includes(diff) || type === 'calc' || type === 'duration') {
+        return "초등 3학년";
+      }
+      if (['1m', '5m', '10m', '15m', '20m'].includes(diff) || type === 'toMin' || type === 'toHour') {
+        return "초등 2학년";
+      }
+      return "초등 1학년";
+    }
+    function generateRandomTime(diff) {
+      let hour = Math.floor(rng() * 12) + 1; 
+      let minute = 0;
+      let second = 0;
+      const preciseMin = () => Math.floor(rng() * 59) + 1; 
+      const preciseSec = () => Math.floor(rng() * 59) + 1; 
+      switch(diff) {
+        case '1h':
+          minute = 0;
+          break;
+        case '30m':
+          minute = rng() < 0.5 ? 0 : 30;
+          break;
+        case '20m':
+          minute = [0, 20, 40][Math.floor(rng() * 3)];
+          break;
+        case '15m':
+          minute = [0, 15, 30, 45][Math.floor(rng() * 4)];
+          break;
+        case '10m':
+          minute = Math.floor(rng() * 6) * 10;
+          break;
+        case '5m':
+          minute = Math.floor(rng() * 12) * 5;
+          break;
+        case '1m':
+          minute = preciseMin();
+          break;
+        case '1s':
+          minute = preciseMin();
+          second = preciseSec();
+          break;
+        case '9hms':
+          minute = preciseMin();
+          second = preciseSec();
+          break;
+        default:
+          minute = preciseMin();
+          break;
+      }
+      return { hour, minute, second };
+    }
+    function getDifficultyKorean(diff) {
+      const mapper = {
+        '1h': '1단계 (1시간 단위)',
+        '30m': '2단계 (30분 단위)',
+        '20m': '3단계 (20분 단위)',
+        '15m': '4단계 (15분 단위)',
+        '10m': '5단계 (10분 단위)',
+        '5m': '6단계 (5분 단위)',
+        '1m': '7단계 (1분 단위)',
+        '1s': '8단계 (초 단위)',
+        '9hms': '9단계 (시/분/초 모두 포함)'
+      };
+      return mapper[diff] || '보통';
+    }
+    // 페이지 내에서 시나리오 중복을 피하며 인덱스를 고른다
+    function pickScenarioIndex(type, length, usedKeys) {
+      let indexes = Array.from({length}, (_, i) => i);
+      indexes.sort(() => rng() - 0.5);
+      for (let idx of indexes) {
+        const key = `${type}-${idx}`;
+        if (!usedKeys || !usedKeys.has(key)) {
+          if (usedKeys) usedKeys.add(key);
+          return idx;
+        }
+      }
+      return Math.floor(rng() * length);
+    }
+    function resolveScenario(type, rawName, extraPlaceholders = {}, usedKeys = null, forcedScenIdx = null) {
+      const list = SCENARIOS[type];
+      if (!list || list.length === 0) return { text: "시나리오 없음", scenIdx: 0 };
+
+      let template = "";
+      let finalIdx = 0;
+      if (forcedScenIdx !== null) {
+        template = list[forcedScenIdx];
+        finalIdx = forcedScenIdx;
+      } else {
+        let indexes = Array.from({length: list.length}, (_, i) => i);
+        indexes.sort(() => rng() - 0.5);
+        for (let idx of indexes) {
+          let key = `${type}-${idx}`;
+          if (!usedKeys || !usedKeys.has(key)) {
+            template = list[idx];
+            finalIdx = idx;
+            if (usedKeys) usedKeys.add(key);
+            break;
+          }
+        }
+        if (!template) {
+          finalIdx = Math.floor(rng() * list.length);
+          template = list[finalIdx];
+        }
+      }
+      let resolved = template;
+      const nameWithI = getDisplayName(rawName);
+      const map = {
+        name: nameWithI,
+        josaEun: selectJosa(rawName, 'eun_neun'),
+        josaI: selectJosa(rawName, 'i_ga'),
+        josaEul: selectJosa(rawName, 'eul_reul'),
+        josaWa: selectJosa(rawName, 'wa_gwa'),
+        ...extraPlaceholders
+      };
+      for (const [key, val] of Object.entries(map)) {
+        resolved = resolved.replaceAll(`{${key}}`, val);
+      }
+      return { text: resolved, scenIdx: finalIdx };
+    }
+    // 임의 템플릿 문자열에 이름·조사·추가 치환자를 적용
+    function fillTemplate(template, rawName, extra = {}) {
+      let resolved = template;
+      const map = {
+        name: getDisplayName(rawName),
+        josaEun: selectJosa(rawName, 'eun_neun'),
+        josaI: selectJosa(rawName, 'i_ga'),
+        josaEul: selectJosa(rawName, 'eul_reul'),
+        josaWa: selectJosa(rawName, 'wa_gwa'),
+        ...extra
+      };
+      for (const [k, v] of Object.entries(map)) resolved = resolved.replaceAll(`{${k}}`, v);
+      return resolved;
+    }
+    // ───────────────────────── QR 자동 채점 (상태 인코딩) ─────────────────────────
+    const ENC_TYPES = ['read', 'draw', 'calc', 'compare', 'before', 'toMin', 'toHour', 'unitRel', 'duration', 'durationCross', 'durationVcalc', 'h24', 'schedule', 'timetable'];
+    const ENC_STYLES = ['subjective', 'objective', 'narrative'];
+    const ENC_CLOCK = ['analog', 'digital', 'mixed'];
+    const ENC_PROG = ['single', 'asc', 'desc', 'mix'];
+    // 짧은 상태 코드 (예: 1.0.0.0.ff.7.9.1.0.abc) — QR이 작아도 잘 읽힘
+    function encodeState(seed, pIdx) {
+      let tmask = 0; ENC_TYPES.forEach((t, i) => { if (config.types.includes(t)) tmask |= (1 << i); });
+      let smask = 0; ENC_STYLES.forEach((s, i) => { if (config.styles.includes(s)) smask |= (1 << i); });
+      const flags = (config.digital24 ? 1 : 0) | (config.koreanTime ? 4 : 0);
+      const parts = [
+        Math.max(0, DIFFS.indexOf(config.baseDifficulty)),
+        Math.max(0, ENC_CLOCK.indexOf(config.clockType)),
+        Math.max(0, ENC_PROG.indexOf(config.progression)),
+        flags, tmask, smask, config.questionsPerPage, config.pages, pIdx, (seed >>> 0)
+      ];
+      // 비중이 기본값(모두 1)이 아니면 끝에 15자리 숫자열로 덧붙임
+      let wStr = '', anyNon1 = false;
+      ENC_TYPES.forEach(t => {
+        let w = (config.typeWeights && config.typeWeights[t]) || 1;
+        w = Math.max(1, Math.min(5, w)); if (w !== 1) anyNon1 = true; wStr += String(w);
+      });
+      const out = parts.map(n => n.toString(36));
+      if (anyNon1) out.push(wStr);
+      return out.join('-');
+    }
+    function decodeState(str) {
+      const tok = str.split(/[.-]/);
+      const p = tok.map(x => parseInt(x, 36));
+      const flags = p[3];
+      const wStr = (tok.length > 10) ? tok[10] : null;
+      const w = {};
+      ENC_TYPES.forEach((t, i) => { w[t] = wStr ? (parseInt(wStr[i], 10) || 1) : 1; });
+      return {
+        d: DIFFS[p[0]] || '30m',
+        c: ENC_CLOCK[p[1]] || 'analog',
+        pr: ENC_PROG[p[2]] || 'single',
+        dg: (flags & 1) ? 1 : 0,
+        cn: (flags & 2) ? 1 : 0,
+        ko: (flags & 4) ? 1 : 0,
+        ex: (flags & 8) ? 1 : 0,
+        ty: ENC_TYPES.filter((t, i) => p[4] & (1 << i)),
+        st: ENC_STYLES.filter((s, i) => p[5] & (1 << i)),
+        qpp: p[6], pg: p[7], p: p[8], sd: (p[9] >>> 0), dt: '', w
+      };
+    }
+    function applyState(s) {
+      config.baseDifficulty = s.d; config.difficulty = s.d; config.clockType = s.c;
+      config.styles = (s.st && s.st.length) ? s.st : ['subjective'];
+      config.types = (s.ty && s.ty.length) ? s.ty : ['read'];
+      config.questionsPerPage = s.qpp;
+      config.pages = s.pg; config.dateStr = s.dt; config.progression = s.pr;
+      config.digital24 = !!s.dg;
+      config.koreanTime = !!s.ko;
+      config.typeWeights = s.w || {};
+    }
+    function buildAnswerKeyText(pIdx) {
+      const qs = generatedPages[pIdx] || [];
+      const lines = qs.map(q => {
+        let a = q.answer;
+        if (a === '시계판 정답 바늘 참조') {
+          const t = q.timeData;
+          a = `${t.hour}시 ${t.minute}분${['1s', '9hms'].includes(q.difficulty) ? ' ' + t.second + '초' : ''}`;
+        }
+        return `${q.globalNum}) ${a}`;
+      });
+      return lines.join('  ');
+    }
+    function makeQRCodes() {
+      if (typeof qrcode === 'undefined') return;
+      // 한글이 깨지지 않도록 UTF-8 바이트 인코딩 사용 (텍스트 정답용)
+      try {
+        if (qrcode.stringToBytesFuncs && qrcode.stringToBytesFuncs['UTF-8']) {
+          qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+        }
+      } catch (e) { /* noop */ }
+      const hosted = (QR_MODE !== 'text') && (!!ANSWER_URL || /^https?:$/.test(location.protocol));
+      const base = hosted ? (ANSWER_URL || location.href.split('#')[0]) : '';
+      generatedPages.forEach((_, pIdx) => {
+        const el = document.getElementById('qr-' + pIdx);
+        if (!el) return;
+        // 호스팅된 주소면 정답 표기 '페이지'로 연결(일일수학 방식), 아니면 정답을 '글자'로
+        const data = hosted
+          ? (base + '#k-' + encodeState(pageSeeds[pIdx], pIdx))
+          : buildAnswerKeyText(pIdx);
+        const draw = (txt, ec) => {
+          const qr = qrcode(0, ec);
+          qr.addData(txt, 'Byte');
+          qr.make();
+          el.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 3, scalable: true });
+          const svg = el.querySelector('svg');
+          if (svg) { svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%'); svg.style.display = 'block'; }
+        };
+        try { draw(data, 'L'); }
+        catch (e) {
+          try { draw(data, 'M'); }
+          catch (e2) { el.innerHTML = '<span class="text-[7px] text-slate-400">QR</span>'; }
+        }
+      });
+    }
+    function onAnswerUrlInput(val) {
+      config.answerUrl = (val || '').trim();
+      if (generatedPages.length) { renderHTML(); renderAllPageClocks(); tryCreateIcons(); }
+    }
+    // QR로 열린 정답 전용 화면 처리
+    function tryAnswerView() {
+      const h = location.hash || '';
+      const i = h.search(/k[-=]/);
+      if (i < 0) return false;
+      let s;
+      try { s = decodeState(h.slice(i + 2)); } catch (e) { return false; }
+      if (!s || s.sd === undefined || isNaN(s.sd)) return false;
+      applyState(s);
+      config.answerUrl = '';
+      answerViewMode = true;
+      showAnswers = true;
+      const pageSeed = (s.sd >>> 0);
+      generatedPages = [buildPageQuestions(pageSeed, s.p)];
+      pageSeeds = [pageSeed];
+      document.body.classList.add('answer-view');setTimeout(fitAnswerView,30);
+      renderHTML();
+      renderAllPageClocks();
+      document.querySelectorAll('.answer-box').forEach(el => { el.classList.remove('invisible', 'opacity-0'); el.classList.add('visible', 'opacity-100'); });
+      const cont = document.getElementById('print-pages-container');
+      if (cont) cont.insertAdjacentHTML('afterbegin', '<div class="max-w-[840px] mx-auto mb-3 bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold flex items-center justify-between"><span>✔ 정답지 (채점용) — made by 특수교사 슬옹쌤</span><span class="text-emerald-100 text-xs">' + (s.dt || '') + '</span></div>');
+      tryCreateIcons();
+      return true;
+    }
+    // 오전/오후: 시간대가 분명한 활동 + 난이도에 맞는 랜덤 시각
+    function generateAmPmNarrative(hasSeconds, usedKeys = null, forcedScenIdx = null) {
+      const scen = [
+        { act: "아침에 스스로 눈을 떠 기지개를 켜며 하루를 시작하는", hrs: [6, 7, 8], pm: false },
+        { act: "책가방을 메고 교문으로 들어서며 등교하는", hrs: [7, 8], pm: false },
+        { act: "1교시 시작 전 도서실에서 아침 독서를 하는", hrs: [9, 10], pm: false },
+        { act: "점심을 먹고 운동장에서 친구들과 신나게 뛰어노는", hrs: [13, 14], pm: true },
+        { act: "태권도장에서 관장님 구령에 맞춰 앞차기를 연습하는", hrs: [15, 16, 17], pm: true },
+        { act: "가족과 둘러앉아 따뜻한 저녁밥을 맛있게 먹는", hrs: [18, 19], pm: true },
+        { act: "책상 앞에 앉아 또박또박 오늘 하루의 그림일기를 쓰는", hrs: [20, 21], pm: true }
+      ];
+      const idx = (forcedScenIdx !== null)
+        ? forcedScenIdx
+        : pickScenarioIndex('ampm', scen.length, usedKeys);
+      const s = scen[idx];
+      const h24 = s.hrs[Math.floor(rng() * s.hrs.length)];
+      const h12 = (h24 % 12 === 0) ? 12 : (h24 % 12);
+      const t = generateRandomTime(config.difficulty);
+      const timeStr = `${h12}시 ${t.minute}분` + (hasSeconds ? ` ${t.second}초` : '');
+      return { text: `${s.act} 시각 (${timeStr})`, isPm: s.pm, scenIdx: idx };
+    }
+    // ───────────────────────── 객관식 오답 보기 ─────────────────────────
+    function makeDistractors(answer) {
+      const out = new Set();
+      const rnd = (arr) => arr.slice().sort(() => rng() - 0.5);
+
+      if (/^(오전|오후)/.test(answer)) {
+        // "오전/오후 X시 Y분 [Z초]"
+        const mer = answer.startsWith('오전') ? '오전' : '오후';
+        const other = mer === '오전' ? '오후' : '오전';
+        const h = +answer.match(/(\d+)시/)[1];
+        const m = +((answer.match(/(\d+)분/) || [])[1] || 0);
+        const hasSec = /초/.test(answer);
+        const s = hasSec ? +((answer.match(/(\d+)초/) || [])[1] || 0) : 0;
+        const tail = hasSec ? ` ${s}초` : '';
+        const cand = [
+          `${other} ${h}시 ${m}분${tail}`,
+          `${mer} ${(h % 12) + 1}시 ${m}분${tail}`,
+          `${mer} ${((h - 2 + 12) % 12) + 1}시 ${m}분${tail}`,
+          `${other} ${(h % 12) + 1}시 ${m}분${tail}`,
+          `${mer} ${h}시 ${(m + 10) % 60}분${tail}`
+        ];
+        for (const c of rnd(cand)) { out.add(c); if (out.size >= 3) break; }
+      } else if (/^\d+(초|분|시간|일)$/.test(answer)) {
+        // 단위 1개 "N단위"
+        const unit = answer.match(/^\d+(초|분|시간|일)$/)[1];
+        const val = parseInt(answer);
+        let offs;
+        if (unit === '초' || unit === '분') offs = [60, -60, 10, -10, 30, -30, 5, -5, 120, -120, 15, -15];
+        else if (unit === '시간') offs = [24, -24, 12, -12, 1, -1, 2, -2, 6, -6, 3, -3];
+        else offs = [1, -1, 2, -2, 7, -7, 3, -3, 5, -5];
+        for (const o of rnd(offs)) { const v = val + o; if (v > 0) out.add(v + unit); if (out.size >= 3) break; }
+      } else if (answer.includes('시간')) {
+        // 경과/소요 "X시간 Y분"
+        let h = 0, m = 0;
+        const hm = answer.match(/(\d+)시간/); if (hm) h = +hm[1];
+        const mm = answer.match(/(\d+)분/); if (mm) m = +mm[1];
+        let total = h * 60 + m;
+        for (const o of rnd([60, -60, 10, -10, 20, -20, 30, -30, 15, -15, 5, -5])) {
+          const v = total + o; if (v > 0) out.add(formatHourMin(v));
+          if (out.size >= 3) break;
+        }
+      } else if (/^\d+분 \d+초$/.test(answer)) {
+        // "X분 Y초"
+        let m = +answer.match(/(\d+)분/)[1], s = +answer.match(/(\d+)초/)[1];
+        let total = m * 60 + s;
+        for (const o of rnd([60, -60, 30, -30, 90, -90, 10, -10, 20, -20])) {
+          const v = total + o; if (v > 0) out.add(formatMinSec(v));
+          if (out.size >= 3) break;
+        }
+      } else if (/\d+시(?!간)/.test(answer)) {
+        // 시각 "X시 Y분 [Z초]" (24시간제 포함)
+        const hasSec = answer.includes('초');
+        let h = +answer.match(/(\d+)시(?!간)/)[1];
+        let m = +((answer.match(/(\d+)분/) || [])[1] || 0);
+        let s = hasSec ? +((answer.match(/(\d+)초/) || [])[1] || 0) : 0;
+        const is24 = h > 12;
+        const combos = rnd([[1,0,0],[-1,0,0],[2,0,0],[-2,0,0],[0,5,0],[0,-5,0],[0,10,0],[0,-10,0],[1,5,0],[-1,-5,0],[0,0,10],[0,0,-10],[3,0,0]]);
+        for (const [ho, mo, so] of combos) {
+          const nh = is24 ? (((h + ho) % 24) + 24) % 24 : ((h - 1 + ho + 12) % 12) + 1;
+          const nm = ((m + mo) % 60 + 60) % 60;
+          const ns = ((s + so) % 60 + 60) % 60;
+          out.add(hasSec ? `${nh}시 ${nm}분 ${ns}초` : `${nh}시 ${nm}분`);
+          if (out.size >= 3) break;
+        }
+      } else if (/^\d+분$/.test(answer) || /^\d+초$/.test(answer)) {
+        // 개수 "N분" / "N초"
+        const unit = answer.includes('초') ? '초' : '분';
+        const val = parseInt(answer);
+        for (const o of rnd([60, -60, 10, -10, 30, -30, 5, -5, 120, -120])) {
+          const v = val + o; if (v > 0) out.add(v + unit);
+          if (out.size >= 3) break;
+        }
+      }
+      out.delete(answer);
+      return Array.from(out).slice(0, 3);
+    }
+    function generateChoices(answer, type, extras) {
+      if (type === 'ampm') {
+        return ["오전", "오후"];
+      }
+      const ordered = [answer];
+      (extras || []).forEach(x => { if (x && !ordered.includes(x)) ordered.push(x); });
+      makeDistractors(answer).forEach(x => { if (!ordered.includes(x)) ordered.push(x); });
+      // 부족 시 형식에 맞는 보기로 안전하게 채운다
+      let pads;
+      if (/^(오전|오후)/.test(answer)) pads = ['오전 8시 0분', '오후 1시 0분', '오전 11시 30분', '오후 7시 0분'];
+      else if (answer.includes('시간')) pads = ['1시간 20분', '2시간 40분', '3시간 10분', '45분'];
+      else if (/^\d+시/.test(answer)) pads = ['12시 0분', '6시 30분', '9시 15분', '3시 45분'];
+      else pads = ['12', '24', '7', '30', '60'].map(n => n + (answer.match(/(초|분|시간|일)$/) || ['', '분'])[1]);
+      let i = 0;
+      while (ordered.length < 4 && i < pads.length) {
+        if (!ordered.includes(pads[i])) ordered.push(pads[i]);
+        i++;
+      }
+      return ordered.slice(0, 4).sort(() => rng() - 0.5);
+    }
+    // ───────────────────────── 문제 생성 ─────────────────────────
+    function buildQuestion(num, type, style, clockType, customTimeData = null, usedKeys = null, forcedNameIdx = null, forcedScenIdx = null) {
+      const timeData = customTimeData ? customTimeData : generateRandomTime(config.difficulty);
+      const hasSeconds = ['1s', '9hms'].includes(config.difficulty);
+
+      let questionText = "";
+      let answer = "";
+      let choices = [];
+      let extraChoices = []; // 오개념 기반 우선 오답
+      let viz = null;        // 시각 자료(세로셈·시간 띠·시간표·빈칸) 데이터
+      const names = ["서준", "하준", "도윤", "지호", "예준", "선우", "서연", "서윤", "지우", "하은", "수아", "지아", "채원", "이준"];
+      const nameIdx = (forcedNameIdx !== null) ? forcedNameIdx : Math.floor(rng() * names.length);
+      const rawName = names[nameIdx];
+      const name = getDisplayName(rawName);
+      const isNarrative = style === 'narrative';
+      const josaEun = selectJosa(rawName, 'eun_neun');
+      const josaI = selectJosa(rawName, 'i_ga');
+      let scenIdx = 0;
+      // 디지털 24시간제 표기: 디지털 표현에 쓸 24시간 값 산출
+      if (config.digital24) {
+        if (timeData.pm === undefined) timeData.pm = rng() < 0.5;
+        timeData.hour24 = timeData.pm
+          ? (timeData.hour === 12 ? 12 : timeData.hour + 12)
+          : (timeData.hour === 12 ? 0 : timeData.hour);
+      }
+      const digitalIs24 = config.digital24; // 디지털 표현을 24시간제로
+      // 통합 유형: 오전·오후 판단과 24시간제 변환을 함께 출제 (객관식은 4지선다 가능한 변환으로)
+      if (type === 'h24' && style !== 'objective' && rng() < 0.45) {
+        type = 'ampm';
+      }
+
+      if (type === 'read') {
+        if (isNarrative) {
+          const scenarioResult = resolveScenario('read', rawName, {}, usedKeys, forcedScenIdx);
+          scenIdx = scenarioResult.scenIdx;
+          const readingTail = hasSeconds 
+            ? " 이 시계가 가리키는 정확한 시각은 몇 시 몇 분 몇 초입니까?"
+            : " 이 시계가 가리키는 시각은 몇 시 몇 분입니까?";
+          questionText = scenarioResult.text + " <span class='text-sky-600 font-bold'>" + readingTail + "</span>";
+        } else {
+          if (clockType === 'analog') {
+            questionText = hasSeconds 
+              ? "다음 아날로그 시계가 나타내는 정확한 시각(몇 시 몇 분 몇 초)을 쓰시오."
+              : "다음 아날로그 시계가 가리키는 시각을 쓰시오.";
+          } else {
+            questionText = hasSeconds
+              ? `제시된 디지털 전자시계의 표기 시각을 한글로 정확히 쓰시오.${digitalIs24 ? ' (24시간제 표기)' : ' (예: X시 X분 X초)'}`
+              : `표시된 디지털 시계의 시각을 올바르게 읽어 한글로 써 보시오.${digitalIs24 ? ' (24시간제 표기)' : ''}`;
+          }
+        }
+        {
+          const useDigital24 = digitalIs24 && clockType !== 'analog';
+          const hh = useDigital24 ? timeData.hour24 : timeData.hour;
+          answer = hasSeconds
+            ? `${hh}시 ${timeData.minute}분 ${timeData.second}초`
+            : `${hh}시 ${timeData.minute}분`;
+        }
+        // 빈칸 채우기(□시 □분) 형태로 흡수 — 아날로그·주관식일 때 일부
+        if (clockType === 'analog' && !isNarrative && style === 'subjective' && rng() < 0.4) {
+          viz = { kind: 'fillbox' };
+          questionText = '시계를 보고 빈칸에 알맞은 수를 써넣어 시각을 완성하시오.';
+        }
+      } 
+      else if (type === 'draw') {
+        let isAnalogToDigital = rng() < 0.5;
+        if (clockType === 'analog_to_digital') isAnalogToDigital = true;
+        else if (clockType === 'analog') isAnalogToDigital = false;
+
+        if (isAnalogToDigital) {
+          clockType = 'analog_to_digital';
+          const adH = digitalIs24 ? timeData.hour24 : timeData.hour;
+          if (isNarrative) {
+            questionText = `${name}${josaEun} 시계를 보고 디지털 타이머에 맞추어 시각을 받아 적으려고 합니다. 아날로그 시계판의 눈금을 보고 디지털 상자 안에 들어갈 알맞은 숫자를 채워 넣으시오.${digitalIs24 ? ' (24시간제로 적기)' : ''}`;
+          } else {
+            questionText = `왼쪽 아날로그 시계가 가리키는 눈금을 읽고, 우측 디지털 공란에 알맞은 숫자를 기입하시오.${digitalIs24 ? ' (24시간제 표기)' : ''}`;
+          }
+          answer = hasSeconds
+            ? `${String(adH).padStart(2, '0')} : ${String(timeData.minute).padStart(2, '0')} : ${String(timeData.second).padStart(2, '0')}`
+            : `${String(adH).padStart(2, '0')} : ${String(timeData.minute).padStart(2, '0')}`;
+        } else {
+          const timeStr = `${timeData.hour}시 ${timeData.minute}분${hasSeconds ? ' ' + timeData.second + '초' : ''}`;
+          if (isNarrative) {
+            let scenarioResult = resolveScenario('draw', rawName, { timeStr: timeStr }, usedKeys, forcedScenIdx);
+            scenIdx = scenarioResult.scenIdx;
+            const drawTail = hasSeconds
+              ? `제시된 시각인 <b>[ ${timeStr} ]</b>에 맞도록 아날로그 시계의 시침, 분침, 초침을 시계판에 정확하게 그려 넣으시오.`
+              : `제시된 시각인 <b>[ ${timeStr} ]</b>에 맞도록 아날로그 시계의 시침과 분침을 시계판에 정확하게 그려 넣으시오.`;
+            questionText = scenarioResult.text.trim() + " " + drawTail;
+          } else {
+            if (clockType === 'digital') {
+              questionText = `오른쪽 디지털 전자시계를 보고, 왼쪽 아날로그 시계판에 <b>[ ${timeStr} ]</b>에 해당하는 시침과 분침${hasSeconds ? '과 초침' : ''}을 정확하게 그려 넣으시오.`;
+            } else {
+              questionText = `제시된 목표 시각인 <b>[ ${timeStr} ]</b>에 맞도록 시침과 분침${hasSeconds ? '과 초침' : ''}을 아날로그 시계 위에 정확하게 그려 넣으시오.`;
+            }
+          }
+          answer = "시계판 정답 바늘 참조";
+        }
+      }
+      else if (type === 'calc') {
+        const mode = secMode();
+        const sub = rng();
+        if (sub < 0.22) {
+          // [흡수] 빠르거나 느린 시계 → 실제 시각 (시각 ± 시간)
+          clockType = 'none';
+          const fast = rng() < 0.5;
+          let offSec, sh;
+          if (mode !== 'none') { offSec = randInt(1, 5) * 30; sh = (timeData.hour % 12) * 3600 + timeData.minute * 60 + (hasSeconds ? timeData.second : 0); }
+          else { offSec = [3, 5, 10, 15][Math.floor(rng() * 4)] * 60; sh = (timeData.hour % 12) * 3600 + timeData.minute * 60; }
+          let actual = fast ? sh - offSec : sh + offSec; actual = ((actual % 43200) + 43200) % 43200;
+          const shownStr = formatClockTime(sh, hasSeconds);
+          answer = formatClockTime(actual, hasSeconds);
+          const kindK = fast ? '빠른' : '느린'; const offLbl = formatDuration(offSec);
+          if (isNarrative) questionText = `${name}의 시계는 정확한 시계보다 <b>${offLbl} ${kindK}</b> 시계입니다. 이 시계가 <b>${shownStr}</b>${josaForWord(shownStr, 'eul_reul')} 가리킬 때, 실제 시각은 몇 시 몇 분${hasSeconds ? ' 몇 초' : ''}입니까?`;
+          else questionText = `<b>${offLbl} ${kindK}</b> 시계가 <b>${shownStr}</b>${josaForWord(shownStr, 'eul_reul')} 가리키고 있습니다. 실제(정확한) 시각을 구하시오.`;
+        } else {
+          // 기본: 시각 더하기/빼기
+          const startH = timeData.hour, startM = timeData.minute;
+          const startS = hasSeconds ? timeData.second : 0;
+          const startTotalSec = ((startH % 12) * 3600) + startM * 60 + startS;
+          let offsetSec;
+          if (mode === 'l9') offsetSec = randInt(0, 2) * 3600 + randInt(1, 59) * 60 + randInt(1, 59); // 시·분·초
+          else if (mode === 'l8') offsetSec = randInt(1, 30) * 60 + randInt(1, 59);                  // 분·초
+          else offsetSec = pickOffsetMinutes(config.difficulty) * 60;                                 // 분(시간)
+          const offsetStr = formatDuration(offsetSec);
+          let sign;
+          if (isNarrative) {
+            const calcSign = ['add', 'sub', 'sub', 'add', 'sub', 'add', 'sub'];
+            const idx = pickScenarioIndex('calc', SCENARIOS.calc.length, usedKeys);
+            sign = calcSign[idx];
+            const resSec = sign === 'add' ? startTotalSec + offsetSec : startTotalSec - offsetSec;
+            answer = formatClockTime(resSec, hasSeconds);
+            const sr = resolveScenario('calc', rawName, {
+              startHour: startH, startMin: startM,
+              startSec: hasSeconds ? ` ${startS}초` : '', offsetStr: offsetStr
+            }, null, idx);
+            scenIdx = sr.scenIdx;
+            questionText = sr.text;
+          } else {
+            sign = rng() < 0.5 ? 'add' : 'sub';
+            const resSec = sign === 'add' ? startTotalSec + offsetSec : startTotalSec - offsetSec;
+            answer = formatClockTime(resSec, hasSeconds);
+            const cur = formatClockTime(startTotalSec, hasSeconds);
+            questionText = sign === 'add'
+              ? `시각 <b>${cur}</b>에서 <b>${offsetStr} 후</b>의 시각을 구하시오.`
+              : `시각 <b>${cur}</b>에서 <b>${offsetStr} 전</b>의 시각을 구하시오.`;
+          }
+        }
+      }
+      else if (type === 'toMin') {
+        clockType = 'none';
+        let valStr, qUnit;
+        const mode = secMode();
+        if (mode === 'l9') {
+          const h = randInt(1, 3), m = randInt(0, 59), s = randInt(1, 59);
+          valStr = (m > 0 ? `${h}시간 ${m}분 ${s}초` : `${h}시간 ${s}초`);
+          answer = `${h * 3600 + m * 60 + s}초`;
+          qUnit = "모두 몇 초입니까?";
+        } else if (mode === 'l8') {
+          const mm = randInt(1, 9), ss = randInt(1, 59);
+          valStr = `${mm}분 ${ss}초`;
+          answer = `${mm * 60 + ss}초`;
+          qUnit = "모두 몇 초입니까?";
+        } else {
+          const h = randInt(1, 3);
+          const m = pickMinuteByStep(config.difficulty);
+          valStr = m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+          answer = `${h * 60 + m}분`;
+          qUnit = "모두 몇 분입니까?";
+          extraChoices.push(`${h * 100 + m}분`); // 1시간=100분으로 착각하는 오개념
+        }
+        if (isNarrative) {
+          const sr = resolveScenario('toMin', rawName, {
+            val: valStr, questionUnit: qUnit,
+            valIGa: josaForWord(valStr, 'i_ga'),
+            valEulReul: josaForWord(valStr, 'eul_reul'),
+            valCopula: josaForWord(valStr, 'copula')
+          }, usedKeys, forcedScenIdx);
+          scenIdx = sr.scenIdx;
+          questionText = sr.text;
+        } else {
+          questionText = `<b>${valStr}</b>${josaForWord(valStr, 'eun_neun')} ${qUnit.replace('입니까?', '인지 변환하시오.')}`;
+        }
+      }
+      else if (type === 'toHour') {
+        clockType = 'none';
+        let valStr, qUnit;
+        const mode = secMode();
+        if (mode === 'l9') {
+          const total = randInt(3661, 14399); // 약 1시간~4시간 (초)
+          valStr = `${total}초`;
+          answer = formatDuration(total); // 시간 분 초
+          qUnit = "몇 시간 몇 분 몇 초입니까?";
+        } else if (mode === 'l8') {
+          const total = randInt(61, 240); // 초
+          valStr = `${total}초`;
+          answer = formatMinSec(total); // 분 초
+          qUnit = "몇 분 몇 초입니까?";
+        } else {
+          const h = randInt(1, 3);
+          const m = pickMinuteByStep(config.difficulty);
+          const total = h * 60 + m;
+          valStr = `${total}분`;
+          answer = formatHourMin(total);
+          qUnit = "몇 시간 몇 분입니까?";
+        }
+        if (isNarrative) {
+          const sr = resolveScenario('toHour', rawName, {
+            val: valStr, questionUnit: qUnit,
+            valIGa: josaForWord(valStr, 'i_ga'),
+            valEulReul: josaForWord(valStr, 'eul_reul'),
+            valCopula: josaForWord(valStr, 'copula')
+          }, usedKeys, forcedScenIdx);
+          scenIdx = sr.scenIdx;
+          questionText = sr.text;
+        } else {
+          questionText = `<b>${valStr}</b>${josaForWord(valStr, 'eun_neun')} ${qUnit}`;
+        }
+      }
+      else if (type === 'ampm') {
+        const scenarioObj = generateAmPmNarrative(hasSeconds, usedKeys, forcedScenIdx);
+        scenIdx = scenarioObj.scenIdx;
+        questionText = `다음 상황의 시각을 읽고, 일어나는 시간대(오전 / 오후)를 바르게 써 보시오.<br><span class="text-xs text-sky-700 bg-sky-50 px-2 py-1 rounded border border-sky-100 block mt-1.5 font-semibold">"${scenarioObj.text}"</span>`;
+        answer = scenarioObj.isPm ? "오후" : "오전";
+        clockType = 'none';
+      }
+      else if (type === 'duration' || type === 'durationCross' || type === 'durationVcalc') {
+        const mode = secMode();
+        const cycle = 43200; // 12시간(초)
+        let startStr, endStr, durUnit;
+        const cross = (type === 'durationCross');
+        const isVcalc = (type === 'durationVcalc');
+        if (cross) {
+          // 오전 → 오후(정오 넘김) 버전
+          const withSec = (mode !== 'none');
+          const m1 = (mode === 'none') ? pickMinuteByStep(config.difficulty) : randInt(0, 59);
+          const m2 = (mode === 'none') ? pickMinuteByStep(config.difficulty) : randInt(0, 59);
+          const s1 = withSec ? randInt(0, 59) : 0;
+          const s2 = withSec ? randInt(0, 59) : 0;
+          const sH = randInt(8, 11), eH = randInt(13, 18);
+          const elapsed = (eH * 3600 + m2 * 60 + s2) - (sH * 3600 + m1 * 60 + s1);
+          startStr = `오전 ${sH}시 ${m1}분` + (withSec ? ` ${s1}초` : '');
+          endStr = `오후 ${eH - 12}시 ${m2}분` + (withSec ? ` ${s2}초` : '');
+          answer = formatDuration(elapsed);
+          durUnit = withSec ? '몇 시간 몇 분 몇 초입니까?' : '몇 시간 몇 분입니까?';
+        } else if (mode === 'none') {
+          // 분 단위 (12시 경계를 넘지 않도록 보장)
+          const step = stepFor(config.difficulty);
+          const eStep = step < 5 ? 5 : step;
+          const maxMult = Math.min(20, Math.floor(300 / eStep));
+          const elapsedMin = eStep * (Math.floor(rng() * maxMult) + 1);
+          const room = 720 - elapsedMin;
+          const slots = Math.max(1, Math.floor(room / eStep));
+          const startMin = Math.floor(rng() * slots) * eStep;
+          startStr = formatClockTime(startMin * 60, false);
+          endStr = formatClockTime((startMin + elapsedMin) * 60, false);
+          answer = formatHourMin(elapsedMin);
+          durUnit = '몇 시간 몇 분입니까?';
+        } else {
+          // 초 포함: l8 = 분·초(1시간 미만), l9 = 시·분·초
+          let elapsedSec;
+          if (mode === 'l9') { elapsedSec = randInt(1, 4) * 3600 + randInt(0, 59) * 60 + randInt(1, 59); durUnit = '몇 시간 몇 분 몇 초입니까?'; }
+          else { elapsedSec = randInt(1, 59) * 60 + randInt(1, 59); durUnit = '몇 분 몇 초입니까?'; }
+          const startSec = randInt(0, cycle - elapsedSec - 1);
+          startStr = formatClockTime(startSec, true);
+          endStr = formatClockTime(startSec + elapsedSec, true);
+          answer = formatDuration(elapsedSec);
+        }
+
+        if (isVcalc) {
+          viz = { kind: 'vcalc', l1: endStr, op: '−', l2: startStr };
+          questionText = `세로셈으로 두 시각 사이에 <b>경과한 시간</b>을 구하시오.`;
+        } else if (cross) {
+          if (isNarrative) {
+            questionText = fillTemplate(`{name}{josaEun} 가족과 나들이를 다녀왔습니다. 집에서 오전 <b>${startStr.replace('오전 ', '')}</b>에 출발하여 오후 <b>${endStr.replace('오후 ', '')}</b>에 돌아왔다면, 나들이에 걸린 시간은 ${durUnit}`, rawName, {});
+          } else {
+            questionText = `<b>${startStr}</b>부터 <b>${endStr}</b>까지 경과한 시간은 ${durUnit}`;
+          }
+        } else if (isNarrative) {
+          const sr = resolveScenario('duration', rawName, {
+            start: startStr, end: endStr, durUnit: durUnit,
+            startCopula: josaForWord(startStr, 'copula'),
+            endCopula: josaForWord(endStr, 'copula')
+          }, usedKeys, forcedScenIdx);
+          scenIdx = sr.scenIdx;
+          questionText = sr.text;
+        } else {
+          const verb = ['경과한', '걸린', '지난'][Math.floor(rng() * 3)];
+          if (rng() < 0.3) {
+            questionText = `지금은 <b>${startStr}</b>입니다. <b>${endStr}</b>까지 <b>남은 시간</b>은 ${durUnit}`;
+          } else {
+            questionText = `<b>${startStr}</b>부터 <b>${endStr}</b>까지 ${verb} 시간은 ${durUnit}`;
+          }
+        }
+        clockType = 'none';
+      }
+      else if (type === 'unitRel') {
+        // 시간 단위 사이의 관계 [2수03-04] — 난이도 모드별 관계, 문장제는 익숙한 상황 풀에서 추출
+        const mode = secMode();
+        const pool = UNITREL_SITS[mode];
+        const idx = isNarrative
+          ? pickScenarioIndex('unitRel_' + mode, pool.length, usedKeys)
+          : Math.floor(rng() * pool.length);
+        const entry = pool[idx];
+        let qStr, qUnit;
+        if (mode === 'l9') {
+          if (entry.type === 'hm_to_min') {
+            const h = randInt(1, 3), m = [10, 15, 20, 30, 40, 45][randInt(0, 5)];
+            qStr = `${h}시간 ${m}분`; answer = `${h * 60 + m}분`; qUnit = '모두 몇 분입니까?';
+          } else if (entry.type === 'hms_to_sec') {
+            const h = randInt(1, 2), m = randInt(1, 30), s = randInt(1, 59);
+            qStr = `${h}시간 ${m}분 ${s}초`; answer = `${h * 3600 + m * 60 + s}초`; qUnit = '모두 몇 초입니까?';
+          } else {
+            const d = randInt(1, 3), h = randInt(1, 23);
+            qStr = `${d}일 ${h}시간`; answer = `${d * 24 + h}시간`; qUnit = '모두 몇 시간입니까?';
+          }
+        } else {
+          const n = randInt(entry.n[0], entry.n[1]);
+          qStr = `${n}${entry.u1}`;
+          answer = `${n * entry.f}${entry.u2}`;
+          qUnit = (entry.u2 === '일') ? '모두 며칠입니까?' : `모두 몇 ${entry.u2}입니까?`;
+        }
+        scenIdx = idx;
+        if (isNarrative) {
+          questionText = fillTemplate(entry.sit, rawName, { q: qStr, questionUnit: qUnit, qIGa: josaForWord(qStr, 'i_ga') });
+        } else {
+          questionText = `<b>${qStr}</b>${josaForWord(qStr, 'eun_neun')} ${qUnit}`;
+        }
+        clockType = 'none';
+      }
+      else if (type === 'h24') {
+        // 24시간제 ↔ 오전·오후 변환. 8단계=초 단위까지 표시, 9단계=초 단위 + 정오·자정(12시) 경계 포함
+        const mode = secMode();
+        const t = generateRandomTime(config.difficulty);
+        const m = (mode === 'none') ? pickMinuteByStep(config.difficulty) : t.minute;
+        const secPart = (mode === 'none') ? '' : ` ${t.second}초`;
+        const useBoundary = (mode === 'l9');
+        const to24 = rng() < 0.5;
+        let shown, convertTo;
+        if (to24) {
+          const pm = rng() < 0.5;
+          const h12 = useBoundary ? randInt(1, 12) : randInt(1, 11);
+          let H;
+          if (h12 === 12) H = pm ? 12 : 0; else H = pm ? h12 + 12 : h12;
+          shown = `${pm ? '오후' : '오전'} ${h12}시 ${m}분${secPart}`;
+          answer = `${H}시 ${m}분${secPart}`;
+          convertTo = '24시간제로 나타내시오.';
+          // 오개념: 오후인데 +12를 안 하거나, 오전인데 +12를 하는 착각
+          const wrongH = pm ? h12 : (h12 + 12);
+          if (wrongH !== H) extraChoices.push(`${wrongH}시 ${m}분${secPart}`);
+        } else {
+          let H;
+          if (useBoundary) H = randInt(0, 23);
+          else H = (rng() < 0.5) ? randInt(1, 11) : randInt(13, 23);
+          shown = `${H}시 ${m}분${secPart}`;
+          if (H === 0) answer = `오전 12시 ${m}분${secPart}`;
+          else if (H === 12) answer = `오후 12시 ${m}분${secPart}`;
+          else if (H > 12) answer = `오후 ${H - 12}시 ${m}분${secPart}`;
+          else answer = `오전 ${H}시 ${m}분${secPart}`;
+          convertTo = '오전과 오후를 사용하여 나타내시오.';
+        }
+        if (isNarrative) {
+          const sr = resolveScenario('h24', rawName, {
+            shown: shown, convertTo: convertTo,
+            shownJosa: josaForWord(shown, 'i_ga')
+          }, usedKeys, forcedScenIdx);
+          scenIdx = sr.scenIdx;
+          questionText = sr.text;
+        } else {
+          questionText = `<b>${shown}</b>${josaForWord(shown, 'eul_reul')} ${convertTo}`;
+        }
+        clockType = 'none';
+      }
+      else if (type === 'before') {
+        // '몇 시 몇 분 전' 표현 ↔ 실제 시각 (양방향). 24시간제 영향 배제 위해 아날로그 고정
+        const di = DIFFS.indexOf(config.difficulty);
+        let r;
+        if (di <= 1) r = [10, 15, 20][Math.floor(rng() * 3)];
+        else if (di <= 7) r = [5, 10, 15, 20, 25][Math.floor(rng() * 5)]; // 8단계까지: 5분 단위
+        else r = randInt(1, 29);                                          // 9단계: 1분 단위
+        const m = 60 - r;
+        const hour12 = ((timeData.hour % 12) === 0) ? 12 : (timeData.hour % 12);
+        const nextHour = (hour12 % 12) + 1;
+        const reverse = rng() < 0.5;
+        if (reverse) {
+          // "○시 ○분 전"이 실제로 몇 시 몇 분인지
+          clockType = 'none';
+          if (isNarrative) {
+            questionText = `${name}${josaEun} 약속 시각을 <b>${nextHour}시 ${r}분 전</b>이라고 들었습니다. 실제 시각은 몇 시 몇 분입니까?`;
+          } else {
+            questionText = `<b>${nextHour}시 ${r}분 전</b>은 몇 시 몇 분입니까? (예: 3시 10분 전 → 2시 50분)`;
+          }
+          answer = `${hour12}시 ${m}분`;
+          extraChoices = [`${nextHour}시 ${m}분`, `${hour12}시 ${r}분`, `${nextHour}시 ${r}분`];
+        } else {
+          clockType = 'analog';
+          timeData.minute = m; timeData.second = 0;
+          if (isNarrative) {
+            questionText = `${name}${josaEun} 시계를 보고 시각을 '몇 시 몇 분 전'으로 쓰려고 합니다. 시계가 가리키는 시각을 <b>□시 □분 전</b>으로 쓰시오.`;
+          } else {
+            questionText = `시계가 가리키는 시각을 <b>'몇 시 몇 분 전'</b>으로 나타내시오. (예: 2시 50분 → 3시 10분 전)`;
+          }
+          answer = `${nextHour}시 ${r}분 전`;
+          extraChoices = [`${hour12}시 ${r}분 전`, `${nextHour}시 ${m}분 전`, `${(nextHour % 12) + 1}시 ${r}분 전`];
+        }
+      }
+      else if (type === 'fill') {
+        // 아날로그 시계를 보고 빈칸(□시 □분)을 채우는 스캐폴딩
+        clockType = 'analog';
+        const hasSec = ['1s', '9hms'].includes(config.difficulty);
+        answer = hasSec
+          ? `${timeData.hour}시 ${timeData.minute}분 ${timeData.second}초`
+          : `${timeData.hour}시 ${timeData.minute}분`;
+        questionText = `시계를 보고 빈칸에 알맞은 수를 써넣어 시각을 완성하시오.`;
+      }
+      else if (type === 'vcalc') {
+        // 세로셈으로 시각 더하기/빼기 (60진법 받아올림·내림, 8·9단계는 초까지)
+        clockType = 'none';
+        const sec = secMode();
+        const startH = ((timeData.hour % 12) === 0) ? 12 : (timeData.hour % 12);
+        const startM = timeData.minute;
+        const startS = (sec !== 'none') ? timeData.second : 0;
+        const offH = (sec === 'l9') ? randInt(0, 2) : randInt(0, 3);
+        const offM = pickMinuteByStep(config.difficulty);
+        const offS = (sec !== 'none') ? randInt(1, 59) : 0;
+        const op = rng() < 0.5 ? 'add' : 'sub';
+        const startTot = (startH % 12) * 3600 + startM * 60 + startS;
+        const offTot = offH * 3600 + offM * 60 + offS;
+        let total = startTot + (op === 'add' ? 1 : -1) * offTot;
+        total = ((total % 43200) + 43200) % 43200;
+        answer = formatClockTime(total, sec !== 'none');
+        const sLab = (sec !== 'none') ? ` ${startS}초` : '';
+        const oLab = (offH > 0 ? offH + '시간 ' : '') + offM + '분' + (sec !== 'none' ? ' ' + offS + '초' : '');
+        viz = { kind: 'vcalc', l1: `${startH}시 ${startM}분${sLab}`, op: (op === 'add' ? '+' : '−'), l2: oLab };
+        questionText = `다음 세로셈을 계산하여 빈칸에 알맞은 시각을 쓰시오.`;
+      }
+      else if (type === 'compare') {
+        // 시각 비교 · 순서 나열
+        clockType = 'none';
+        const sec = secMode();
+        let pool;
+        if (style === 'objective' || isNarrative) pool = ['cmp'];
+        else pool = ['cmp', 'order'];
+        const subMode = pool[Math.floor(rng() * pool.length)];
+
+        if (subMode === 'order') {
+          // 3개의 시간을 짧은/긴 순으로 나열
+          const vals = [];
+          while (vals.length < 3) { const v = randInt(1, 3) * 30 + [0, 10, 15, 20, 40][Math.floor(rng() * 5)]; if (!vals.includes(v)) vals.push(v); }
+          const expr = (v) => { if (v >= 60 && rng() < 0.5) { const h = Math.floor(v / 60), mm = v % 60; return h + '시간' + (mm ? ' ' + mm + '분' : ''); } return v + '분'; };
+          const labeled = vals.map(v => ({ v, s: expr(v) }));
+          const asc = rng() < 0.5;
+          const sorted = labeled.slice().sort((x, y) => asc ? x.v - y.v : y.v - x.v);
+          questionText = `다음 시간을 ${asc ? '<b>짧은</b>' : '<b>긴</b>'} 것부터 차례로 나열하시오. : ${labeled.map(o => '<b>' + o.s + '</b>').join(' , ')}`;
+          answer = sorted.map(o => o.s).join(' → ');
+        } else {
+          // 시각·시간 대소 비교 (한쪽은 항상 다른 단위, 8·9단계는 초 실생활)
+          let A, B, av, bv;
+          if (sec !== 'none') {
+            const big = (sec === 'l9');
+            av = big ? randInt(150, 360) : randInt(40, 120);
+            if (rng() < 0.25) bv = av; else { bv = av + (rng() < 0.5 ? 1 : -1) * randInt(1, 6) * 10; if (bv <= 0) bv = av + 20; }
+            A = `${av}초`;
+            B = formatMinSec(bv);
+            if (isNarrative) questionText = `다음 두 기록 <b>${A}</b>${josaForWord(A, 'wa_gwa')} <b>${B}</b> 중 더 <b>긴(오래 걸린)</b> 것을 쓰시오. (같으면 '같다')`;
+            else questionText = `다음 두 시간 중 더 <b>긴</b> 것을 쓰시오. 같으면 '같다'. : <b>${A}</b> , <b>${B}</b>`;
+          } else {
+            av = randInt(1, 3) * 60 + [0, 5, 10, 15, 20, 30, 40, 45][Math.floor(rng() * 8)];
+            if (rng() < 0.25) bv = av; else { bv = av + (rng() < 0.5 ? 1 : -1) * (randInt(1, 5) * 5); if (bv < 60) bv = av + 5; }
+            A = `${av}분`;
+            const h = Math.floor(bv / 60), mm = bv % 60;
+            B = (h > 0 ? h + '시간' : '') + (mm > 0 ? ' ' + mm + '분' : '');
+            B = B.trim() || '0분';
+            if (isNarrative) questionText = `다음 두 시간 <b>${A}</b>${josaForWord(A, 'wa_gwa')} <b>${B}</b> 중 더 <b>긴</b> 것을 쓰시오. (같으면 '같다')`;
+            else questionText = `다음 두 시간 중 더 <b>긴</b> 것을 쓰시오. 같으면 '같다'. : <b>${A}</b> , <b>${B}</b>`;
+          }
+          answer = av > bv ? A : (bv > av ? B : '같다');
+          extraChoices = [A, B, '같다', (sec !== 'none') ? `${av + bv}초` : `${av + bv}분`];
+        }
+      }
+      else if (type === 'fastslow') {
+        // 빠르거나 느린 시계 → 실제 시각 구하기 (8·9단계는 초 단위 오차)
+        clockType = 'none';
+        const sec = secMode();
+        const fast = rng() < 0.5;
+        let offSec, sh;
+        if (sec !== 'none') {
+          offSec = randInt(1, 5) * 30; // 30~150초
+          sh = (timeData.hour % 12) * 3600 + timeData.minute * 60 + timeData.second;
+        } else {
+          offSec = [3, 5, 10, 15][Math.floor(rng() * 4)] * 60;
+          sh = (timeData.hour % 12) * 3600 + timeData.minute * 60;
+        }
+        let actual = fast ? sh - offSec : sh + offSec;
+        actual = ((actual % 43200) + 43200) % 43200;
+        const shownStr = formatClockTime(sh, sec !== 'none');
+        answer = formatClockTime(actual, sec !== 'none');
+        const kind = fast ? '빠른' : '느린';
+        const offLbl = formatDuration(offSec);
+        if (isNarrative) {
+          questionText = `${name}의 시계는 정확한 시계보다 <b>${offLbl} ${kind}</b> 시계입니다. 이 시계가 <b>${shownStr}</b>${josaForWord(shownStr, 'eul_reul')} 가리킬 때, 실제 시각은 몇 시 몇 분${sec !== 'none' ? ' 몇 초' : ''}입니까?`;
+        } else {
+          questionText = `<b>${offLbl} ${kind}</b> 시계가 <b>${shownStr}</b>${josaForWord(shownStr, 'eul_reul')} 가리키고 있습니다. 실제(정확한) 시각을 구하시오.`;
+        }
+      }
+      else if (type === 'timeline') {
+        // 시간 띠(수직선)를 보고 경과 시간 구하기
+        clockType = 'none';
+        const step = stepFor(config.difficulty); const est = step < 5 ? 5 : step;
+        const startH = randInt(1, 9);
+        const startMin = startH * 60 + (Math.floor(rng() * (60 / est)) * est);
+        const elapsed = est * randInt(1, Math.min(12, Math.max(1, Math.floor(180 / est))));
+        const endMin = startMin + elapsed;
+        answer = formatHourMin(elapsed);
+        viz = { kind: 'timeline', startMin, endMin };
+        questionText = `시간 띠를 보고 <b>경과한 시간</b>을 구하시오.`;
+      }
+      else if (type === 'schedule') {
+        // 시간표(일과표)를 보고 시각·경과·활동 찾기
+        clockType = 'none';
+        const acts = ['국어', '수학', '통합교과', '체육', '음악', '미술', '쉬는 시간', '독서', '슬기로운 생활'];
+        const start0 = randInt(8, 10) * 60 + [0, 10, 20, 30][Math.floor(rng() * 4)];
+        const chosen = acts.slice().sort(() => rng() - 0.5).slice(0, 4);
+        const qi = Math.floor(rng() * 3);
+        let rows = [], t = start0;
+        for (let tryN = 0; tryN < 40; tryN++) {
+          rows = []; t = start0;
+          for (let i = 0; i < 4; i++) { const d = [30, 40, 45, 50, 10][Math.floor(rng() * 5)]; rows.push({ name: chosen[i], s: t, e: t + d }); t += d; }
+          if (qi !== 2) break;
+          const lens = rows.map(r => r.e - r.s), mxL = Math.max(...lens);
+          if (lens.filter(l => l === mxL).length === 1) break;   // '가장 긴 활동'은 가장 긴 것이 하나일 때만 출제
+        }
+        if (qi === 0) { const k = randInt(0, 3); questionText = `시간표에서 <b>${rows[k].name}</b>${josaForWord(rows[k].name, 'i_ga')} 시작하는 시각은 몇 시 몇 분입니까?`; answer = formatClockTime(rows[k].s * 60, false); }
+        else if (qi === 1) { const k = randInt(0, 3); questionText = `시간표에서 <b>${rows[k].name}</b>${josaForWord(rows[k].name, 'eun_neun')} 몇 분 동안입니까?`; answer = `${rows[k].e - rows[k].s}분`; }
+        else { let mi = 0; for (let i = 1; i < 4; i++) if ((rows[i].e - rows[i].s) > (rows[mi].e - rows[mi].s)) mi = i; questionText = `시간표에서 가장 <b>긴</b> 활동의 이름을 쓰시오.`; answer = rows[mi].name; extraChoices = rows.map(r => r.name); }
+        viz = { kind: 'schedule', rows };
+      }
+      else if (type === 'order') {
+        // 시각·시간 3개를 짧은/긴 순으로 나열
+        clockType = 'none';
+        const vals = [];
+        while (vals.length < 3) { const v = randInt(1, 3) * 30 + [0, 10, 15, 20, 40][Math.floor(rng() * 5)]; if (!vals.includes(v)) vals.push(v); }
+        const expr = (v) => { if (v >= 60 && rng() < 0.5) { const h = Math.floor(v / 60), mm = v % 60; return h + '시간' + (mm ? ' ' + mm + '분' : ''); } return v + '분'; };
+        const labeled = vals.map(v => ({ v, s: expr(v) }));
+        const asc = rng() < 0.5;
+        const sorted = labeled.slice().sort((x, y) => asc ? x.v - y.v : y.v - x.v);
+        questionText = `다음 시간을 ${asc ? '<b>짧은</b>' : '<b>긴</b>'} 것부터 차례로 나열하시오. : ${labeled.map(o => '<b>' + o.s + '</b>').join(' , ')}`;
+        answer = sorted.map(o => o.s).join(' → ');
+      }
+      else if (type === 'd2a') {
+        // 디지털 시각을 보고 아날로그 시계에 바늘 그리기
+        clockType = 'analog';
+        const sec = secMode();
+        const digStr = `${String(timeData.hour).padStart(2, '0')} : ${String(timeData.minute).padStart(2, '0')}${sec !== 'none' ? ' : ' + String(timeData.second).padStart(2, '0') : ''}`;
+        if (isNarrative) {
+          questionText = `${name}${josaI} 본 디지털 시계는 <b>${digStr}</b> 였습니다. 같은 시각이 되도록 아날로그 시계에 바늘을 그리시오.`;
+        } else {
+          questionText = `디지털 시계가 <b>${digStr}</b> 를 나타냅니다. 아날로그 시계에 알맞게 <b>바늘을 그리시오.</b>`;
+        }
+        answer = `${timeData.hour}시 ${timeData.minute}분${sec !== 'none' ? ' ' + timeData.second + '초' : ''}`;
+      }
+      else if (type === 'dayplan') {
+        // 하루 생활 계획표(24시간 원 그래프) 읽기 — 질문 다양화
+        clockType = 'none';
+        const acts = ['수면', '아침 식사', '학교', '점심 식사', '숙제', '운동', '독서', '놀이', 'TV 시청', '저녁 식사', '목욕'];
+        const nSeg = randInt(4, 5);
+        const chosen = acts.slice().sort(() => rng() - 0.5).slice(0, nSeg);
+        const segs = []; let t = randInt(6, 8);
+        for (let i = 0; i < nSeg && t < 23; i++) { const d = [2, 3, 4][Math.floor(rng() * 3)]; segs.push({ name: chosen[i], s: t, e: Math.min(24, t + d) }); t += d; }
+        const k = Math.floor(rng() * segs.length);
+        const qi = Math.floor(rng() * 6);
+        const longestIdx = () => { let mi = 0; for (let i = 1; i < segs.length; i++) if ((segs[i].e - segs[i].s) > (segs[mi].e - segs[mi].s)) mi = i; return mi; };
+        const shortestIdx = () => { let mi = 0; for (let i = 1; i < segs.length; i++) if ((segs[i].e - segs[i].s) < (segs[mi].e - segs[mi].s)) mi = i; return mi; };
+        if (qi === 0) { questionText = `생활 계획표에서 <b>${segs[k].name}</b>${josaForWord(segs[k].name, 'eun_neun')} 몇 시에 시작합니까?`; answer = `${segs[k].s}시`; }
+        else if (qi === 1) { questionText = `생활 계획표에서 <b>${segs[k].name}</b>${josaForWord(segs[k].name, 'eun_neun')} 몇 시에 끝납니까?`; answer = `${segs[k].e}시`; }
+        else if (qi === 2) { questionText = `생활 계획표에서 <b>${segs[k].name}</b>${josaForWord(segs[k].name, 'eun_neun')} 몇 시간 동안입니까?`; answer = `${segs[k].e - segs[k].s}시간`; }
+        else if (qi === 3) { const mi = longestIdx(); questionText = `생활 계획표에서 가장 <b>오랜 시간</b> 하는 활동을 쓰시오.`; answer = segs[mi].name; extraChoices = segs.map(s => s.name); }
+        else if (qi === 4) { const mi = shortestIdx(); questionText = `생활 계획표에서 가장 <b>짧은 시간</b> 하는 활동을 쓰시오.`; answer = segs[mi].name; extraChoices = segs.map(s => s.name); }
+        else { if (k < segs.length - 1) { questionText = `생활 계획표에서 <b>${segs[k].name}</b> 바로 <b>다음</b>에 하는 활동을 쓰시오.`; answer = segs[k + 1].name; extraChoices = segs.map(s => s.name); } else { questionText = `생활 계획표에서 <b>${segs[k].name}</b>${josaForWord(segs[k].name, 'eun_neun')} 몇 시에 끝납니까?`; answer = `${segs[k].e}시`; } }
+        viz = { kind: 'dayplan', segs };
+      }
+      else if (type === 'convtable') {
+        // 단위 환산표 빈칸 채우기 (시간↔분↔초)
+        clockType = 'none';
+        const mk = () => {
+          const kind = ['h2m', 'hm2m', 'm2s', 'm2hm'][Math.floor(rng() * 4)];
+          if (kind === 'h2m') { const h = randInt(1, 5); return { left: `${h}시간`, ans: `${h * 60}분` }; }
+          if (kind === 'hm2m') { const h = randInt(1, 3), mm = [10, 15, 20, 30, 40, 45][Math.floor(rng() * 6)]; return { left: `${h}시간 ${mm}분`, ans: `${h * 60 + mm}분` }; }
+          if (kind === 'm2s') { const mm = randInt(1, 5); return { left: `${mm}분`, ans: `${mm * 60}초` }; }
+          const tot = randInt(2, 5) * 60 + [10, 20, 30, 40][Math.floor(rng() * 4)]; return { left: `${tot}분`, ans: `${Math.floor(tot / 60)}시간 ${tot % 60}분` };
+        };
+        const rows = [mk(), mk(), mk()];
+        answer = rows.map(r => r.ans).join(', ');
+        viz = { kind: 'convtable', rows };
+        questionText = `환산표의 빈칸에 알맞은 수를 써넣으시오.`;
+      }
+      else if (type === 'timetable') {
+        // 교통(버스·기차) 시간표 — 시각이 명확해 분 단위로 답하기 쉬움
+        clockType = 'none';
+        const interval = [10, 12, 15, 20][Math.floor(rng() * 4)];
+        const start = randInt(6, 9) * 60 + [0, 5, 10][Math.floor(rng() * 3)];
+        const times = []; for (let i = 0; i < 5; i++) times.push(start + i * interval);
+        const qi = Math.floor(rng() * 4);
+        if (qi === 0) {
+          questionText = `버스가 일정한 간격으로 출발합니다. <b>배차 간격</b>은 몇 분입니까?`;
+          answer = `${interval}분`;
+        } else if (qi === 1) {
+          const idx = randInt(1, 3); const arrTime = times[idx] - randInt(1, interval - 1);
+          questionText = `<b>${formatClockTime(arrTime * 60, false)}</b>에 정류장에 도착했습니다. <b>다음 버스</b>는 몇 시 몇 분입니까?`;
+          answer = formatClockTime(times[idx] * 60, false);
+        } else if (qi === 2) {
+          questionText = `첫차가 <b>${formatClockTime(times[0] * 60, false)}</b>이고 일정한 간격으로 출발합니다. <b>4번째</b> 버스는 몇 시 몇 분입니까?`;
+          answer = formatClockTime(times[3] * 60, false);
+        } else {
+          questionText = `버스 시간표에서 <b>${formatClockTime(times[1] * 60, false)}</b> 버스와 <b>${formatClockTime(times[3] * 60, false)}</b> 버스 사이의 시간은 몇 분입니까?`;
+          answer = `${times[3] - times[1]}분`;
+        }
+        viz = { kind: 'timetable', times };
+      }
+
+      if (style === 'objective') {
+        choices = generateChoices(answer, type, extraChoices);
+      }
+      // 한글 시각 표기 (읽기)
+      if (config.koreanTime && type === 'read') {
+        answer = clockToKorean(answer);
+        if (choices.length) choices = choices.map(clockToKorean);
+      }
+      return {
+        num, type, style, clockType,
+        questionText, timeData, answer, choices, nameIdx, scenIdx, viz
+      };
+    }
+    const ALLOWED_STYLES = {
+      read: ['subjective', 'objective', 'narrative'],
+      draw: ['subjective', 'narrative'],
+      calc: ['subjective', 'objective', 'narrative'],
+      toMin: ['subjective', 'objective', 'narrative'],
+      toHour: ['subjective', 'objective', 'narrative'],
+      ampm: ['subjective', 'narrative'],
+      duration: ['subjective', 'objective', 'narrative'],
+      durationCross: ['subjective', 'objective', 'narrative'],
+      durationVcalc: ['subjective'],
+      unitRel: ['subjective', 'objective', 'narrative'],
+      h24: ['subjective', 'objective', 'narrative'],
+      compare: ['subjective', 'objective', 'narrative'],
+      before: ['subjective', 'objective', 'narrative'],
+      schedule: ['subjective', 'objective', 'narrative'],
+      timetable: ['subjective', 'objective', 'narrative']
+    };
+    // 문항별 난이도 결정 (난이도 배치)
+    function computePerQDiff(globalIndex, total) {
+      const selIdx = Math.max(0, DIFFS.indexOf(config.baseDifficulty));
+      const mode = config.progression || 'single';
+      if (mode === 'single' || selIdx === 0 || total <= 1) return config.baseDifficulty;
+      const ratio = globalIndex / (total - 1);
+      let idx;
+      if (mode === 'asc') idx = Math.round(ratio * selIdx);
+      else if (mode === 'desc') idx = Math.round((1 - ratio) * selIdx);
+      else idx = Math.floor(rng() * (selIdx + 1)); // mix
+      idx = Math.min(selIdx, Math.max(0, idx));
+      return DIFFS[idx];
+    }
+    // 한 페이지 문제를 시드로 결정적으로 생성 (QR 재현에 동일 함수 사용)
+    function buildPageQuestions(pageSeed, pIdx) {
+      rng = mulberry32(pageSeed >>> 0);
+      const qpp = config.questionsPerPage;
+      const total = config.pages * qpp;
+      const pageQuestions = [];
+      const usedTimesOnPage = new Set();
+      const usedScenarioKeys = new Set();
+      // 표준 순서로 정렬 (선택 순서와 무관하게 같은 시드 → 같은 결과 보장: QR 재현)
+      const typesC = ENC_TYPES.filter(t => config.types.includes(t));
+      const orderedTypes = typesC.length ? typesC : ['read'];
+      const stylesC = ENC_STYLES.filter(s => config.styles.includes(s));
+      const orderedStyles = stylesC.length ? stylesC : ['subjective'];
+      // 유형별 비중 풀 (가중 무작위 선택)
+      const weightPool = [];
+      orderedTypes.forEach(t => {
+        let w = (config.typeWeights && config.typeWeights[t]) || 1;
+        w = Math.max(1, Math.min(5, w));
+        for (let i = 0; i < w; i++) weightPool.push(t);
+      });
+      for (let q = 0; q < qpp; q++) {
+        const globalIndex = pIdx * qpp + q;
+        const perQDiff = computePerQDiff(globalIndex, total);
+        config.difficulty = perQDiff; // buildQuestion이 참조하는 현재 난이도
+
+        const selectedType = weightPool[Math.floor(rng() * weightPool.length)];
+        let availableStyles = orderedStyles.filter(s => ALLOWED_STYLES[selectedType].includes(s));
+        if (availableStyles.length === 0) availableStyles = ['subjective'];
+        const selectedStyle = availableStyles[Math.floor(rng() * availableStyles.length)];
+
+        let curClockType = config.clockType;
+        if (curClockType === 'mixed') curClockType = rng() < 0.5 ? 'analog' : 'digital';
+
+        let timeCandidate = generateRandomTime(perQDiff);
+        let key = `${timeCandidate.hour}-${timeCandidate.minute}-${timeCandidate.second}`;
+        let retry = 0;
+        while (usedTimesOnPage.has(key) && retry < 150) {
+          timeCandidate = generateRandomTime(perQDiff);
+          key = `${timeCandidate.hour}-${timeCandidate.minute}-${timeCandidate.second}`;
+          retry++;
+        }
+        usedTimesOnPage.add(key);
+        const qObj = buildQuestion(q + 1, selectedType, selectedStyle, curClockType, timeCandidate, usedScenarioKeys);
+        qObj.difficulty = perQDiff;
+        qObj.globalNum = pIdx * qpp + q + 1;
+        pageQuestions.push(qObj);
+      }
+      config.difficulty = config.baseDifficulty; // 복원
+      return pageQuestions;
+    }
+    function readOptionsFromUI() {
+      const diffEl = document.getElementById('difficulty');
+      if (diffEl) { config.difficulty = diffEl.value; config.baseDifficulty = diffEl.value; }
+      const progEl = document.getElementById('progression');
+      if (progEl) config.progression = progEl.value;
+      const clockTypeEl = document.querySelector('input[name="clock-type"]:checked');
+      if (clockTypeEl) config.clockType = clockTypeEl.value;
+      config.digital24 = !!document.getElementById('opt-digital24')?.checked;
+      config.koreanTime = !!document.getElementById('opt-korean')?.checked;
+      config.bigMode = !!document.getElementById('opt-big')?.checked;
+      config.clockNoNumbers = !!document.getElementById('opt-nonumber')?.checked;
+      config.clockMinuteTicks = !!document.getElementById('opt-mintick')?.checked;
+      config.boldKey = !!document.getElementById('opt-boldkey')?.checked;
+      config.typeWeights = {};
+      document.querySelectorAll('.type-weight').forEach(i => {
+        config.typeWeights[i.dataset.type] = Math.max(1, Math.min(5, parseInt(i.value) || 1));
+      });
+      const styles = [];
+      if (document.getElementById('style-subjective')?.checked) styles.push('subjective');
+      if (document.getElementById('style-objective')?.checked) styles.push('objective');
+      if (document.getElementById('style-narrative')?.checked) styles.push('narrative');
+      config.styles = styles;
+      const types = [];
+      document.querySelectorAll('.type-checkbox:checked').forEach(el => types.push(el.value));
+      config.types = types;
+      if (config.styles.length === 0) {
+        config.styles = ['subjective'];
+        const subCheck = document.getElementById('style-subjective');
+        if (subCheck) subCheck.checked = true;
+      }
+      if (config.types.length === 0) {
+        config.types = ['read'];
+        const firstType = document.querySelector('.type-checkbox');
+        if (firstType) firstType.checked = true;
+      }
+    }
+    function regenerateSheet() {
+      readOptionsFromUI();
+      generatedPages = [];
+      pageSeeds = [];
+      const baseSeed = ((Date.now() ^ Math.floor(rng() * 0x1000000)) & 0xFFFFFF) >>> 0;
+      for (let p = 0; p < config.pages; p++) {
+        const pageSeed = (baseSeed + p * 0x9E3779B1) >>> 0;
+        pageSeeds.push(pageSeed);
+        generatedPages.push(buildPageQuestions(pageSeed, p));
+      }
+      renderHTML();
+      renderAllPageClocks();
+      tryCreateIcons();
+    }
+    // ───────────────────────── 한글 시각 표기 ─────────────────────────
+    const HOUR_KO = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉', '열', '열한', '열두'];
+    function sinoKo(n) {
+      if (n === 0) return '영';
+      const d1 = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+      const tens = ['', '십', '이십', '삼십', '사십', '오십'];
+      const t = Math.floor(n / 10), o = n % 10;
+      return (tens[t] || '') + (d1[o] || '');
+    }
+    function clockToKorean(str) {
+      const m = str.match(/^(\d+)시 (\d+)분(?: (\d+)초)?$/);
+      if (!m) return str;
+      const h = +m[1], mi = +m[2], se = m[3] !== undefined ? +m[3] : null;
+      if (h < 1 || h > 12) return str; // 24시간제 등은 변환하지 않음
+      let out = `${HOUR_KO[h]} 시`;
+      if (mi > 0) out += ` ${sinoKo(mi)} 분`;
+      if (se !== null && se > 0) out += ` ${sinoKo(se)} 초`;
+      if (mi === 0 && (se === null || se === 0)) out += ` 정각`;
+      return out;
+    }
+    // ───────────────────────── 시각 자료 렌더 ─────────────────────────
+    function renderTimeline(s, e) {
+      const h0 = Math.floor(s / 60), h1 = Math.ceil(e / 60);
+      const W = 260, padL = 16, padR = 16, y = 34;
+      const span = Math.max(1, (h1 - h0) * 60);
+      const x = (min) => padL + ((min - h0 * 60) / span) * (W - padL - padR);
+      let ticks = '';
+      for (let h = h0; h <= h1; h++) {
+        const xx = x(h * 60);
+        ticks += `<line x1="${xx}" y1="${y - 5}" x2="${xx}" y2="${y + 5}" stroke="#475569" stroke-width="1"/>`
+          + `<text x="${xx}" y="${y + 16}" font-size="8" text-anchor="middle" fill="#64748b">${(h % 12) || 12}시</text>`;
+      }
+      const mk = (xx, label, color) =>
+        `<line x1="${xx}" y1="${y - 13}" x2="${xx}" y2="${y}" stroke="${color}" stroke-width="2"/>`
+        + `<circle cx="${xx}" cy="${y}" r="2.6" fill="${color}"/>`
+        + `<text x="${xx}" y="${y - 16}" font-size="7.5" text-anchor="middle" fill="${color}" font-weight="bold">${label}</text>`;
+      return `<div class="my-1 flex justify-center"><svg viewBox="0 0 ${W} 58" style="width:100%;max-width:230px">`
+        + `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#94a3b8" stroke-width="1.5"/>`
+        + ticks + mk(x(s), '시작', '#0ea5e9') + mk(x(e), '끝', '#ef4444') + `</svg></div>`;
+    }
+    function renderViz(q, pIdx, qIdx) {
+      const showSec = ['1s', '9hms'].includes(q.difficulty);
+      const kind = q.viz ? q.viz.kind : null;
+      if (kind === 'fillbox') {
+        const aH = showAnswers ? String(q.timeData.hour) : '';
+        const aM = showAnswers ? String(q.timeData.minute) : '';
+        const aS = showAnswers ? String(q.timeData.second) : '';
+        const fpx = config.bigMode ? 150 : 120;
+        const box = (v) => `<span class="inline-flex items-center justify-center w-7 h-7 border-b-2 border-slate-400 text-[13px] font-black ${showAnswers ? 'text-red-500' : ''}">${v}</span>`;
+        return `<div class="flex flex-col items-center my-1 gap-1">
+          <canvas id="canvas-${pIdx}-${qIdx}" class="clock-canvas border border-slate-200 rounded-full shadow-inner bg-white" style="width:${fpx}px;height:${fpx}px;"></canvas>
+          <div class="flex items-end gap-1 text-[12px] font-bold text-slate-500">${box(aH)}시 ${box(aM)}분 ${showSec ? box(aS) + '초' : ''}</div>
+        </div>`;
+      }
+      if (kind === 'vcalc') {
+        const v = q.viz;
+        return `<div class="my-1 flex justify-center">
+          <div class="inline-block text-right font-mono text-[13px] leading-6 text-slate-800 min-w-[108px]">
+            <div>${v.l1}</div>
+            <div class="border-b-2 border-slate-700 pb-0.5">${v.op} ${v.l2}</div>
+            <div class="pt-0.5 ${showAnswers ? 'text-red-500 font-bold' : ''}">${showAnswers ? q.answer : '&nbsp;'}</div>
+          </div>
+        </div>`;
+      }
+      if (kind === 'timeline') {
+        return renderTimeline(q.viz.startMin, q.viz.endMin);
+      }
+      if (kind === 'schedule') {
+        const rows = q.viz.rows.map(r =>
+          `<tr><td class="border border-slate-300 px-1.5 py-0.5">${r.name}</td>`
+          + `<td class="border border-slate-300 px-1.5 py-0.5 text-center whitespace-nowrap">${formatClockTime(r.s * 60, false)} ~ ${formatClockTime(r.e * 60, false)}</td></tr>`).join('');
+        return `<div class="my-1 flex justify-center"><table class="text-[10px] border-collapse"><tbody>${rows}</tbody></table></div>`;
+      }
+      if (kind === 'dayplan') {
+        const segs = q.viz.segs;
+        const cx = 70, cy = 70, rOut = 56, rIn = 38;
+        const palette = ['#0284c7', '#d97706', '#059669', '#dc2626', '#7c3aed'];
+        const ang = (h) => (h / 24) * 2 * Math.PI - Math.PI / 2;
+        const pt = (r, h) => [cx + r * Math.cos(ang(h)), cy + r * Math.sin(ang(h))];
+        let arcs = '';
+        segs.forEach((s, i) => {
+          const [x0o, y0o] = pt(rOut, s.s), [x1o, y1o] = pt(rOut, s.e), [x1i, y1i] = pt(rIn, s.e), [x0i, y0i] = pt(rIn, s.s);
+          const large = (s.e - s.s) > 12 ? 1 : 0;
+          arcs += `<path d="M${x0o.toFixed(1)} ${y0o.toFixed(1)} A${rOut} ${rOut} 0 ${large} 1 ${x1o.toFixed(1)} ${y1o.toFixed(1)} L${x1i.toFixed(1)} ${y1i.toFixed(1)} A${rIn} ${rIn} 0 ${large} 0 ${x0i.toFixed(1)} ${y0i.toFixed(1)} Z" fill="${palette[i % palette.length]}" fill-opacity="0.6" stroke="#1e293b" stroke-width="0.7"/>`;
+        });
+        let ticks = '';
+        for (let h = 0; h < 24; h += 3) {
+          const [tx, ty] = pt(rOut + 9, h);
+          const [a, b] = pt(rOut, h), [c, d] = pt(rOut - 4, h);
+          ticks += `<line x1="${a.toFixed(1)}" y1="${b.toFixed(1)}" x2="${c.toFixed(1)}" y2="${d.toFixed(1)}" stroke="#475569" stroke-width="0.8"/>`
+            + `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-size="7" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-weight="bold">${h}</text>`;
+        }
+        const legend = segs.map((s, i) => `<div class="flex items-center gap-1"><span style="display:inline-block;width:8px;height:8px;background:${palette[i % palette.length]};border-radius:2px"></span>${s.name}</div>`).join('');
+        return `<div class="my-1 flex items-center justify-center gap-2">
+          <svg viewBox="0 0 140 140" style="width:108px;height:108px"><circle cx="${cx}" cy="${cy}" r="${rOut}" fill="none" stroke="#cbd5e1" stroke-width="1"/>${arcs}${ticks}</svg>
+          <div class="text-[9px] text-slate-700 space-y-0.5 leading-tight">${legend}</div>
+        </div>`;
+      }
+      if (kind === 'convtable') {
+        const rows = q.viz.rows.map(r =>
+          `<tr><td class="border border-slate-400 px-2 py-0.5">${r.left}</td>`
+          + `<td class="border border-slate-400 px-1 py-0.5 text-center">=</td>`
+          + `<td class="border border-slate-400 px-2 py-0.5 text-center ${showAnswers ? 'text-red-500 font-bold' : ''}" style="min-width:54px">${showAnswers ? r.ans : '&nbsp;'}</td></tr>`).join('');
+        return `<div class="my-1 flex justify-center"><table class="text-[10.5px] border-collapse"><tbody>${rows}</tbody></table></div>`;
+      }
+      if (kind === 'daybar' && q.viz) {
+        const segs = q.viz.segs;
+        const palette = ['#0284c7', '#d97706', '#059669', '#dc2626', '#7c3aed'];
+        const x0 = 8, x1 = 196, y = 30, h = 18;
+        const sx = (hr) => x0 + (x1 - x0) * (hr / 24);
+        let bars = '', ticks = '';
+        segs.forEach((s, i) => {
+          bars += `<rect x="${sx(s.s).toFixed(1)}" y="${y}" width="${(sx(s.e) - sx(s.s)).toFixed(1)}" height="${h}" fill="${palette[i % palette.length]}" fill-opacity="0.65" stroke="#1e293b" stroke-width="0.6"/>`;
+        });
+        for (let hr = 0; hr <= 24; hr += 3) {
+          const x = sx(hr);
+          ticks += `<line x1="${x.toFixed(1)}" y1="${y - 2}" x2="${x.toFixed(1)}" y2="${y + h + 2}" stroke="#94a3b8" stroke-width="0.6"/>`
+            + `<text x="${x.toFixed(1)}" y="${y + h + 11}" font-size="7" text-anchor="middle" fill="#334155">${hr}</text>`;
+        }
+        const legend = segs.map((s, i) => `<div class="flex items-center gap-1"><span style="display:inline-block;width:8px;height:8px;background:${palette[i % palette.length]};border-radius:2px"></span>${s.name}</div>`).join('');
+        return `<div class="my-1 flex flex-col items-center gap-1">
+          <svg viewBox="0 0 204 62" style="width:200px;height:60px"><rect x="${x0}" y="${y}" width="${x1 - x0}" height="${h}" fill="none" stroke="#cbd5e1" stroke-width="0.8"/>${bars}${ticks}<text x="2" y="${y + h / 2 + 2}" font-size="6.5" fill="#64748b">시</text></svg>
+          <div class="flex flex-wrap gap-x-2 gap-y-0.5 justify-center text-[9px] text-slate-700">${legend}</div>
+        </div>`;
+      }
+      if (kind === 'timetable') {
+        const chips = q.viz.times.map((t, i) => `<span class="inline-block border border-slate-400 rounded px-1.5 py-0.5 text-[9.5px] whitespace-nowrap bg-white">${i + 1}번 ${formatClockTime(t * 60, false)}</span>`).join('');
+        return `<div class="my-1"><div class="text-[9px] font-bold text-slate-500 mb-1 text-center">버스 출발 시각표</div><div class="flex flex-wrap gap-1 justify-center">${chips}</div></div>`;
+      }
+      return `<div class="my-1.5 min-h-[96px]"></div>`;
+    }
+    function renderHTML() {
+      const container = document.getElementById('print-pages-container');
+      if (!container) return;
+      container.innerHTML = "";
+      const ALL_STYLES = ['subjective', 'objective', 'narrative'];
+      const ALL_TYPES = ['read', 'draw', 'calc', 'compare', 'before', 'toMin', 'toHour', 'unitRel', 'duration', 'durationCross', 'durationVcalc', 'h24', 'schedule', 'timetable'];
+      generatedPages.forEach((questions, pIdx) => {
+        const pageDiv = document.createElement('div');
+        pageDiv.className = "bg-white p-5 md:p-6 shadow-lg border border-slate-200 rounded-2xl print-area page-break max-w-[840px] mx-auto h-[1180px] overflow-hidden flex flex-col" + (config.bigMode ? " big-mode" : "");
+
+        const styleBadges = ALL_STYLES.map(s => {
+          const isSelected = config.styles.includes(s);
+          const bgClass = isSelected 
+            ? 'bg-sky-600 text-white border-sky-600 font-bold' 
+            : 'bg-slate-50 text-slate-400 border-slate-200 font-normal';
+          return `<span class="${bgClass} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${KOREAN_STYLES[s]}</span>`;
+        }).join('');
+        const typeBadgeList = ALL_TYPES.map(t => {
+          const isSelected = config.types.includes(t);
+          const bgClass = isSelected 
+            ? 'bg-sky-600 text-white border-sky-600 font-bold' 
+            : 'bg-slate-50 text-slate-400 border-slate-200 font-normal';
+          return `<span class="${bgClass} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${KOREAN_TYPES[t]}</span>`;
+        });
+        const typeRows = [];
+        for (let i = 0; i < typeBadgeList.length; i += 6) {
+          typeRows.push(`<div class="flex gap-1">${typeBadgeList.slice(i, i + 6).join('')}</div>`);
+        }
+        const typeBadgesBlock = typeRows.join('');
+        const progBadgeLabel = { single: '단일 (고정)', asc: '쉬움→어려움', desc: '어려움→쉬움', mix: '혼합 (무작위)' }[config.progression] || '단일 (고정)';
+        const optionsBadges = `
+          <div class="flex flex-col gap-1.5 mt-2.5 text-[10px] items-start">
+            <div class="flex flex-wrap items-center gap-1">
+              <span class="font-extrabold text-slate-600 text-[9px] uppercase tracking-wide whitespace-nowrap shrink-0">문항 방식:</span>
+              ${styleBadges}
+            </div>
+            <div class="flex flex-wrap items-center gap-1">
+              <span class="font-extrabold text-slate-600 text-[9px] uppercase tracking-wide whitespace-nowrap shrink-0">난이도 배치:</span>
+              <span class="bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap shrink-0">${progBadgeLabel}</span>
+            </div>
+            <div class="flex items-start gap-1">
+              <span class="font-extrabold text-slate-600 text-[9px] uppercase tracking-wide whitespace-nowrap shrink-0 pt-0.5">세부 유형:</span>
+              <div class="flex flex-col gap-1">${typeBadgesBlock}</div>
+            </div>
+          </div>
+        `;
+        const progLabel = { single: '', asc: ' · 쉬움→어려움', desc: ' · 어려움→쉬움', mix: ' · 혼합' }[config.progression] || '';
+        const diffLabelMain = (config.progression === 'single')
+          ? getDifficultyKorean(config.baseDifficulty)
+          : (getDifficultyKorean(config.baseDifficulty).split(' ')[0] + '단계까지' + progLabel);
+        const pageNum = (questions[0] && questions[0].globalNum)
+          ? Math.floor((questions[0].globalNum - 1) / config.questionsPerPage) + 1
+          : (pIdx + 1);
+        const qrBlock = `
+          <div class="flex flex-col items-center gap-0.5 shrink-0">
+            <div id="qr-${pIdx}" class="w-[100px] h-[100px] bg-white border border-slate-200 rounded p-1 flex items-center justify-center overflow-hidden"></div>
+            <span class="text-[8px] text-slate-500 font-bold leading-none">정답 QR (스캔)</span>
+          </div>`;
+        let headerHtml = `
+          <div class="border-b-2 border-slate-800 pb-2 mb-2">
+            <div class="flex justify-between items-start gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="bg-sky-600 text-white text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full">PAGE ${pageNum}</span>
+                  <h1 class="text-xl font-extrabold tracking-tight text-slate-900">시계보기 맞춤형 학습지</h1>
+                  <span class="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded-full">made by 특수교사 슬옹쌤</span>
+                </div>
+                ${optionsBadges}
+              </div>
+              <div class="flex items-start gap-2 shrink-0">
+                <div class="text-right text-[10px] text-slate-600 space-y-0.5 bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-medium">
+                  <div>출력 일자: ${config.dateStr}</div>
+                  <div>학습 단계: ${diffLabelMain}</div>
+                  <div>총 문항수: ${config.questionsPerPage}문항</div>
+                </div>
+                ${qrBlock}
+              </div>
+            </div>
+          </div>
+        `;
+        const cols = config.bigMode ? 2 : 3;
+        const gridRows = Math.max(1, Math.ceil(config.questionsPerPage / cols));
+        const clkPx = config.bigMode ? 156 : 128;
+        let gridHtml = `<div class="grid gap-2.5 flex-1 min-h-0" style="grid-template-columns: repeat(${cols}, minmax(0,1fr)); grid-template-rows: repeat(${gridRows}, minmax(0, 1fr));">`;
+
+        questions.forEach((q, qIdx) => {
+          const globalIdx = q.globalNum || (pIdx * config.questionsPerPage + q.num);
+          let displayArea = "";
+          const qDiff = q.difficulty || config.difficulty;
+          const qHasSec = ['1s', '9hms'].includes(qDiff);
+          const digH = (config.digital24 && q.timeData.hour24 !== undefined) ? q.timeData.hour24 : q.timeData.hour;
+          const levelBadge = getGradeLevel(qDiff, q.type);
+
+          const VIZ_KINDS = ['vcalc', 'timeline', 'schedule', 'dayplan', 'daybar', 'convtable', 'timetable', 'fillbox'];
+          const hasViz = q.viz && VIZ_KINDS.includes(q.viz.kind);
+          if (hasViz) {
+            displayArea = renderViz(q, pIdx, qIdx);
+          } else if (q.clockType === 'none') {
+            displayArea = `<div class="my-1.5 min-h-[96px]"></div>`;
+          } else {
+            if (q.clockType === 'analog') {
+              displayArea = `
+                <div class="flex justify-center my-1">
+                  <canvas id="canvas-${pIdx}-${qIdx}" class="clock-canvas border border-slate-200 rounded-full shadow-inner bg-white" style="width:${clkPx}px;height:${clkPx}px;"></canvas>
+                </div>
+              `;
+            } else if (q.clockType === 'digital') {
+              const displayTime = `${String(digH).padStart(2, '0')} : ${String(q.timeData.minute).padStart(2, '0')}${qHasSec ? ' : ' + String(q.timeData.second).padStart(2, '0') : ''}`;
+
+              if (q.type === 'draw') {
+                const drawPx = config.bigMode ? 132 : 112;
+                displayArea = `
+                  <div class="flex flex-row flex-nowrap items-center justify-center my-1 w-full gap-1.5 px-1">
+                    <canvas id="canvas-${pIdx}-${qIdx}" class="clock-canvas border border-slate-200 rounded-full shadow-inner bg-white shrink-0" style="width:${drawPx}px;height:${drawPx}px;"></canvas>
+                    <div class="bg-white text-slate-900 border border-slate-300 font-mono text-[11px] font-black px-1.5 py-1.5 rounded-lg shadow-sm tracking-tight text-center whitespace-nowrap shrink-0">
+                      ${displayTime}
+                    </div>
+                  </div>
+                `;
+              } else {
+                displayArea = `
+                  <div class="flex justify-center items-center my-2 h-[75px]">
+                    <div class="bg-white text-slate-900 border-2 border-slate-300 shadow-sm rounded-xl font-mono text-xl md:text-2xl font-extrabold px-5 py-2 tracking-wider text-center whitespace-nowrap overflow-hidden" style="min-width: 130px;">
+                      ${displayTime}
+                    </div>
+                  </div>
+                `;
+              }
+            } else if (q.clockType === 'analog_to_digital') {
+              const showSeconds = qHasSec;
+              const ansH = showAnswers ? String(digH).padStart(2, '0') : '';
+              const ansM = showAnswers ? String(q.timeData.minute).padStart(2, '0') : '';
+              const ansS = showAnswers ? String(q.timeData.second).padStart(2, '0') : '';
+
+              displayArea = `
+                <div class="flex flex-col items-center justify-center my-1 gap-1 w-full">
+                  <canvas id="canvas-${pIdx}-${qIdx}" class="clock-canvas border border-slate-200 rounded-full shadow-inner bg-white" style="width:${clkPx}px;height:${clkPx}px;"></canvas>
+                  <div class="flex items-center justify-center gap-1 mt-0.5">
+                    <div class="w-10 h-10 border-2 border-dashed border-slate-400 rounded-xl flex flex-col justify-center items-center bg-slate-50 relative">
+                      <span class="absolute top-0.5 text-[7px] font-bold text-slate-400 select-none">시</span>
+                      <span class="text-xs font-black text-red-500 mt-2.5 ${showAnswers ? 'visible' : 'invisible'}">${ansH}</span>
+                    </div>
+                    <span class="font-extrabold text-slate-400 text-sm">:</span>
+                    <div class="w-10 h-10 border-2 border-dashed border-slate-400 rounded-xl flex flex-col justify-center items-center bg-slate-50 relative">
+                      <span class="absolute top-0.5 text-[7px] font-bold text-slate-400 select-none">분</span>
+                      <span class="text-xs font-black text-red-500 mt-2.5 ${showAnswers ? 'visible' : 'invisible'}">${ansM}</span>
+                    </div>
+                    ${showSeconds ? `
+                      <span class="font-extrabold text-slate-400 text-sm">:</span>
+                      <div class="w-10 h-10 border-2 border-dashed border-slate-400 rounded-xl flex flex-col justify-center items-center bg-slate-50 relative">
+                        <span class="absolute top-0.5 text-[7px] font-bold text-slate-400 select-none">초</span>
+                        <span class="text-xs font-black text-red-500 mt-2.5 ${showAnswers ? 'visible' : 'invisible'}">${ansS}</span>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            }
+          }
+          let answerMarkup = "";
+          if (q.style === 'objective') {
+            const choiceMaxLen = Math.max(...q.choices.map(c => String(c).length));
+            const longCh = choiceMaxLen > 9; // 한글 시각 등 긴 선지
+            const gridCol = longCh ? 'grid-cols-1' : 'grid-cols-2';
+            const chFont = longCh ? 'text-[10px]' : 'text-[11px]';
+            const chTextCls = longCh ? 'flex-1 whitespace-normal break-keep leading-tight' : 'truncate max-w-[110px]';
+            answerMarkup = `
+              <div class="mt-1.5">
+                <div class="grid ${gridCol} gap-x-1 gap-y-0.5">
+                  ${q.choices.map((choice, idx) => `
+                    <div class="${chFont} text-slate-500 flex items-start gap-1">
+                      <span class="inline-block w-3.5 h-3.5 shrink-0 rounded-full border border-slate-300 text-[9px] text-center leading-3.5 font-bold">${idx + 1}</span>
+                      <span class="${chTextCls}">${choice}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="mt-1 text-[9px] border-t border-slate-100 pt-0.5 text-slate-400">
+                  정답 기입: ( <span class="answer-box ${showAnswers ? 'visible text-red-500 font-bold text-xs' : 'invisible opacity-0'}">${q.choices.indexOf(q.answer) + 1}</span> )
+                </div>
+              </div>
+            `;
+          } else {
+            answerMarkup = `
+              <div class="mt-1.5 border-b border-dashed border-slate-300 pb-0.5 flex items-baseline">
+                <span class="text-[9px] text-slate-400 font-semibold mr-1">정답 :</span>
+                <span class="answer-box text-[11px] font-extrabold text-red-500 pl-0.5 ${showAnswers ? 'visible' : 'invisible opacity-0'}">
+                  ${q.answer}
+                </span>
+              </div>
+            `;
+          }
+          let qtextHtml = q.questionText;
+          if (config.boldKey) {
+            // 중요 부분 강조: 파란색 강조를 검은 볼드로 통일
+            qtextHtml = qtextHtml.replace(/<span class='text-sky-600 font-bold'>([\s\S]*?)<\/span>/g, '<b>$1</b>');
+          } else {
+            // 균일 텍스트: 볼드·글자색 강조 모두 제거
+            qtextHtml = qtextHtml
+              .replace(/<span class='text-sky-600 font-bold'>([\s\S]*?)<\/span>/g, '$1')
+              .replace(/<\/?b>/g, '')
+              .replace(/text-sky-700/g, 'text-slate-600')
+              .replace(/bg-sky-50/g, 'bg-slate-50')
+              .replace(/border-sky-100/g, 'border-slate-200');
+          }
+          gridHtml += `
+            <div class="flex flex-col justify-between border border-slate-200 p-2 rounded-xl bg-white relative overflow-hidden min-h-0 min-w-0 hover:shadow-sm transition">
+              <div class="min-h-0">
+                <div class="flex flex-col gap-0.5 mb-0.5">
+                  <div class="flex justify-between items-center w-full">
+                    <span class="font-black text-sky-600 text-xs md:text-sm leading-none">${globalIdx}.</span>
+                    <span class="text-[7.5px] bg-slate-100 text-slate-500 border border-slate-200 px-1 rounded font-bold">${levelBadge}</span>
+                  </div>
+                  <p class="qtext-el text-[11.5px] md:text-xs font-medium text-slate-900 leading-normal">${qtextHtml}</p>
+                </div>
+                ${displayArea}
+              </div>
+              <div>
+                ${answerMarkup}
+              </div>
+            </div>
+          `;
+        });
+        gridHtml += `</div>`;
+        const watermarkHtml = `
+          <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[8px] text-slate-300 select-none">
+            <span>ⓒ made by 특수교사 슬옹쌤 · 시계보기 학습지 자동 생성</span>
+            <span>PAGE ${pageNum} / ${config.pages}</span>
+          </div>`;
+        pageDiv.innerHTML = headerHtml + gridHtml + watermarkHtml;
+        container.appendChild(pageDiv);
+      });
+      makeQRCodes();
+    }
+    // 시계 캔버스 그래픽
+    function renderClock(canvasId, timeData, isDrawType, diff) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      const cssSize = canvas.clientWidth || 128;
+      // 고해상도 렌더링: 디바이스 픽셀비의 2배(최대 4배)로 내부 버퍼를 키워 인쇄 시에도 선명하게
+      const scale = Math.min(4, (window.devicePixelRatio || 1) * 2);
+      canvas.width = Math.round(cssSize * scale);
+      canvas.height = Math.round(cssSize * scale);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+      const center = cssSize / 2;
+      const radius = center - 6; // 원이 캔버스를 벗어나 잘리지 않도록 여백 확보
+
+      ctx.clearRect(0, 0, cssSize, cssSize);
+
+      // 시계 원
+      ctx.beginPath();
+      ctx.arc(center, center, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#000000";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(center, center, 3.5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#000000";
+      ctx.fill();
+      // 눈금선 (5분 눈금은 항상, 1분 눈금은 옵션)
+      for (let i = 0; i < 60; i++) {
+        const isMajor = (i % 5 === 0);
+        if (!isMajor && !config.clockMinuteTicks) continue;
+        const angle = (i * Math.PI) / 30;
+        ctx.beginPath();
+        let length = 3.5;
+        let widthOfTick = 0.8;
+        let color = "#475569";
+        if (isMajor) {
+          length = 7.0;
+          widthOfTick = 2.0;
+          color = "#000000";
+        }
+        const startX = center + (radius - length) * Math.sin(angle);
+        const startY = center - (radius - length) * Math.cos(angle);
+        const endX = center + radius * Math.sin(angle);
+        const endY = center - radius * Math.cos(angle);
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = widthOfTick;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+      // 숫자 (옵션: 숫자 없는 시계)
+      if (!config.clockNoNumbers) {
+        ctx.font = "900 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+        ctx.fillStyle = "#000000";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (let num = 1; num <= 12; num++) {
+          const angle = (num * Math.PI) / 6;
+          const x = center + (radius - 13) * Math.sin(angle);
+          const y = center - (radius - 13) * Math.cos(angle);
+          ctx.fillText(num.toString(), x, y);
+        }
+      }
+      // 바늘 그리기 문제는 정답 보기 전엔 바늘을 그리지 않음
+      if (isDrawType && !showAnswers) {
+        return;
+      }
+      const hr = timeData.hour % 12;
+      const min = timeData.minute;
+      const sec = timeData.second || 0;
+      const hourAngle = (hr * Math.PI / 6) + (min * Math.PI / 360) + (sec * Math.PI / 21600);
+      const minuteAngle = (min * Math.PI / 30) + (sec * Math.PI / 1800);
+      const secondAngle = (sec * Math.PI / 30);
+      drawHand(ctx, center, hourAngle, radius * 0.5, 3.5, "#000000", true);
+      drawHand(ctx, center, minuteAngle, radius * 0.74, 2.0, "#000000", true);
+      const hasSecondsDiff = ['1s', '9hms'].includes(diff || config.difficulty);
+      if (hasSecondsDiff) {
+        drawHand(ctx, center, secondAngle, radius * 0.82, 0.9, "#ef4444", false);
+        ctx.beginPath();
+        ctx.arc(center, center, 2.5, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ef4444";
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(center, center, 1.5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+    }
+    function drawHand(ctx, center, angle, length, width, color, hasArrow) {
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(0, 5);
+      ctx.lineTo(0, -length);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.stroke();
+      if (hasArrow) {
+        ctx.beginPath();
+        const arrowSize = width * 1.8 + 1.2;
+        ctx.moveTo(0, -length);
+        ctx.lineTo(-arrowSize * 0.5, -length + arrowSize);
+        ctx.lineTo(arrowSize * 0.5, -length + arrowSize);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    // 카드 내용이 넘칠 때 자동으로 조금씩 줄여 맞춤(잘림 방지)
+    function fitCards() {
+      document.querySelectorAll('.print-area > div.grid > div').forEach(function (card) {
+        var inner = card.children[0]; if (!inner) return;
+        inner.style.zoom = '';
+        var z = 1, guard = 0;
+        while (card.scrollHeight - card.clientHeight > 1 && z > 0.5 && guard++ < 14) { z = Math.max(0.5, z - 0.05); inner.style.zoom = z; }
+      });
+    }
+    function renderAllPageClocks() {
+      generatedPages.forEach((questions, pIdx) => {
+        questions.forEach((q, qIdx) => {
+          const skipClockTypes = ['toMin', 'toHour', 'duration', 'unitRel', 'h24'];
+          const shouldHideClock = skipClockTypes.includes(q.type) || q.clockType === 'none';
+          if (!shouldHideClock) {
+            if (q.clockType === 'analog' || q.clockType === 'analog_to_digital' || (q.clockType === 'digital' && q.type === 'draw')) {
+              const isDrawType = ((q.type === 'draw' || q.type === 'd2a') && q.clockType !== 'analog_to_digital');
+              renderClock(`canvas-${pIdx}-${qIdx}`, q.timeData, isDrawType, q.difficulty);
+            }
+          }
+        });
+      });      try { fitCards(); } catch (e) {}
+    }
+    function printSheet() {
+      try {
+        if (window.self !== window.top) {
+          window.parent.focus();
+          window.parent.print();
+          return;
+        }
+      } catch (err) {
+        console.warn("Direct parent print blocked, trying fallback printer...");
+      }
+      try {
+        window.focus();
+        window.print();
+      } catch (e) {
+        const printContent = document.getElementById('print-pages-container').innerHTML;
+        const printWindow = window.open('', '_blank', 'width=900,height=1200');
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>시계 학습지 출력</title>
+              <script src="https://cdn.tailwindcss.com"></` + `script>
+              <style>
+                body { font-family: 'Noto Sans KR', sans-serif; background: #fff; }
+                .print-area { page-break-after: always; break-after: page; }
+                .clock-canvas { image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+              </style>
+            </head>
+            <body onload="setTimeout(function(){ window.print(); window.close(); }, 500)">
+              <div class="p-8 max-w-[900px] mx-auto">
+                ${printContent}
+              </div>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    }
+    // 세부 유형 각 항목에 출제 비중(1~5) 입력을 주입
+    const TYPE_EXAMPLES = {
+      read: '예) 시계를 보고 "3시 20분" 읽기', draw: '예) 시각에 맞게 아날로그 바늘 그리기',
+      calc: '예) 3시 20분 + 40분 = ?', toMin: '예) 2시간 10분 = 130분', toHour: '예) 150분 = 2시간 30분',
+      duration: '예) 9시~10시 30분 경과 시간 (정오 안 넘김)', durationCross: '예) 오전 10시~오후 2시 경과 시간', durationVcalc: '예) 세로셈으로 끝 시각 − 시작 시각',
+      unitRel: '예) 1시간=60분, 하루=24시간', h24: '예) 오후 3시 = 15시',
+      before: '예) 2시 50분 → "3시 10분 전"', fill: '예) □시 □분 빈칸 채우기', vcalc: '예) 세로셈으로 시·분 받아올림',
+      compare: '예) 70분 vs 1시간 20분 비교', fastslow: '예) 5분 빠른 시계의 실제 시각', timeline: '예) 시간 띠로 경과 시간 구하기',
+      schedule: '예) 시간표에서 시각·경과 찾기', order: '예) 세 시간을 짧은 순으로 나열', d2a: '예) 디지털 12:35 → 아날로그 그리기',
+      dayplan: '예) 24시간 생활 계획표 읽기', convtable: '예) 2시간=□분 환산표 채우기', timetable: '예) 배차 간격·다음 버스 시각'
+    };
+    function onGroupToggle(groupCb) {
+      const g = groupCb.dataset.group;
+      document.querySelectorAll('.type-checkbox[data-group="' + g + '"]').forEach(cb => { cb.checked = groupCb.checked; });
+      regenerateSheet();
+    }
+    function onTypeToggle(typeCb) {
+      const g = typeCb.dataset.group;
+      const subs = Array.from(document.querySelectorAll('.type-checkbox[data-group="' + g + '"]'));
+      const groupCb = document.querySelector('.group-checkbox[data-group="' + g + '"]');
+      if (groupCb) groupCb.checked = subs.every(cb => cb.checked);
+      regenerateSheet();
+    }
+    function syncGroupCheckboxes() {
+      document.querySelectorAll('.group-checkbox').forEach(groupCb => {
+        const g = groupCb.dataset.group;
+        const subs = Array.from(document.querySelectorAll('.type-checkbox[data-group="' + g + '"]'));
+        if (subs.length) groupCb.checked = subs.every(cb => cb.checked);
+      });
+    }
+    function setupTypeWeights() {
+      document.querySelectorAll('.type-checkbox').forEach(cb => {
+        const label = cb.closest('label'); if (!label) return;
+        if (TYPE_EXAMPLES[cb.value]) label.title = TYPE_EXAMPLES[cb.value];
+        if (label.querySelector('.type-weight')) return;
+        const inp = document.createElement('input');
+        inp.type = 'number'; inp.min = '1'; inp.max = '5'; inp.value = '1';
+        inp.className = 'type-weight ml-auto w-9 text-[10px] text-center border border-slate-200 rounded px-0.5 py-0.5';
+        inp.dataset.type = cb.value; inp.title = '출제 비중(1~5)';
+        inp.addEventListener('click', e => e.stopPropagation());
+        inp.addEventListener('input', () => regenerateSheet());
+        label.appendChild(inp);
+      });
+    }
+    function syncUIFromConfig() {
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      const chk = (id, v) => { const e = document.getElementById(id); if (e) e.checked = !!v; };
+      set('difficulty', config.baseDifficulty);
+      set('progression', config.progression);
+      chk('opt-digital24', config.digital24);
+      chk('opt-korean', config.koreanTime); chk('opt-big', config.bigMode);
+      chk('opt-nonumber', config.clockNoNumbers);
+      chk('opt-mintick', config.clockMinuteTicks);
+      chk('opt-boldkey', config.boldKey);
+      chk('style-subjective', config.styles.includes('subjective'));
+      chk('style-objective', config.styles.includes('objective'));
+      chk('style-narrative', config.styles.includes('narrative'));
+      document.querySelectorAll('input[name="clock-type"]').forEach(r => r.checked = (r.value === config.clockType));
+      document.querySelectorAll('.type-checkbox').forEach(cb => cb.checked = config.types.includes(cb.value));
+      syncGroupCheckboxes();
+      document.querySelectorAll('.type-weight').forEach(i => { i.value = (config.typeWeights && config.typeWeights[i.dataset.type]) || 1; });
+      const pagesEl = document.getElementById('sheet-pages'); if (pagesEl) pagesEl.value = config.pages;
+      const qEl = document.getElementById('questions-count'); if (qEl) { qEl.value = config.questionsPerPage; if (typeof updateQuestionsCount === 'function') updateQuestionsCount(config.questionsPerPage); }
+    }
+    window.regenerateSheet = regenerateSheet;
+    window.renderAllPageClocks = renderAllPageClocks;
+    window.renderClock = renderClock;
+    window.drawHand = drawHand;
+    window.printSheet = printSheet;
+    window.toggleAnswers = toggleAnswers;
+    window.setPagesDropdown = setPagesDropdown;
+    window.onGroupToggle = onGroupToggle;
+    window.onTypeToggle = onTypeToggle;
+    window.updateQuestionsCount = updateQuestionsCount;
+    window.onAnswerUrlInput = onAnswerUrlInput;
+    window.initApp = function() {
+      initDate();
+      // QR로 열린 정답 전용 화면이면 그 페이지만 채점용으로 표시(호스팅한 경우)
+      if (tryAnswerView()) return;
+      setupTypeWeights();
+      window.regenerateSheet();
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', window.initApp);
+    } else {
+      window.initApp();
+    }
+  </script>
+</body>
+</html>

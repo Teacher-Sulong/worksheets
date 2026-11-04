@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>[수학] 달력보기 맞춤형 학습지 생성기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+    body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; }
+    @media print {
+      html, body { background-color: #fff !important; height: auto !important; overflow: visible !important; }
+      .no-print { display: none !important; }
+      main { display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
+      #print-pages-container { display: block !important; width: 100% !important; }
+      .print-area {
+        width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 6mm !important;
+        box-sizing: border-box !important; box-shadow: none !important; border: none !important;
+        page-break-after: always !important; break-after: page !important; page-break-inside: avoid !important;
+        height: 285mm !important; overflow: hidden !important;
+      }
+      .print-area:last-child { page-break-after: auto !important; break-after: auto !important; }
+      @page { size: A4; margin: 6mm; }
+    }
+    body.answer-view #main-header, body.answer-view #option-panel,
+    body.answer-view #print-control-toolbar, body.answer-view footer { display: none !important; }
+    body.answer-view main { display: block; padding: 10px; max-width: 900px; margin: 0 auto; }
+    body.answer-view .print-area { box-shadow: none; border-color: #e2e8f0; }
+    .print-area.big-mode .qtext-el { font-size: 14.5px !important; line-height: 1.55 !important; }
+    .print-area.big-mode .answer-box { font-size: 14px !important; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+  <header id="main-header" class="bg-green-700 text-white shadow-md py-4 px-6 no-print">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <i data-lucide="calendar-days" class="w-8 h-8 text-yellow-300"></i>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">[수학] 달력보기 맞춤형 학습지 생성기</h1>
+          <p class="text-xs text-green-200">초등 수학 교육과정 기반 맞춤형 문제 자동 생성 플랫폼 · <b class="text-yellow-200">made by 특수교사 슬옹쌤</b></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-sm text-green-100 bg-green-700 px-3 py-1.5 rounded-lg">
+        <i data-lucide="info" class="w-4 h-4"></i>
+        <span>정확한 인쇄를 위해 <b>[배경 그래픽 인쇄]</b> 옵션을 켜주세요.</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-6">
+    <!-- 옵션 패널 -->
+    <section id="option-panel" class="w-full md:w-96 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 shrink-0 self-start no-print">
+      <div class="flex items-center gap-2 pb-4 border-b border-slate-100">
+        <i data-lucide="sliders" class="w-5 h-5 text-green-700"></i>
+        <h2 class="text-lg font-bold text-slate-950">학습지 형성 옵션</h2>
+      </div>
+
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">인쇄 페이지 수 (최대 10장)</label>
+        <select id="sheet-pages" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-green-700 focus:outline-none font-medium" onchange="setPagesDropdown(this.value)">
+          <option value="1">1장 생성</option><option value="2" selected>2장 생성</option>
+          <option value="3">3장 생성</option><option value="4">4장 생성</option>
+          <option value="5">5장 생성</option><option value="6">6장 생성</option>
+          <option value="7">7장 생성</option><option value="8">8장 생성</option>
+          <option value="9">9장 생성</option><option value="10">10장 대량 생성</option>
+        </select>
+        <p class="text-xs text-slate-400">각 페이지당 최대 9개의 문제가 포함됩니다.</p>
+      </div>
+
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700 flex justify-between">
+          <span>페이지당 문제 수</span><span id="num-of-questions-val" class="text-green-700 font-bold">9개</span>
+        </label>
+        <input type="range" id="questions-count" min="1" max="9" value="9" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-green-700" oninput="updateQuestionsCount(this.value)">
+        <div class="flex justify-between text-[10px] text-slate-400"><span>1개</span><span>3개</span><span>6개</span><span>9개</span></div>
+      </div>
+
+      <div class="space-y-2">
+        <label for="progression" class="block text-sm font-semibold text-slate-700">난이도 배치 방식</label>
+        <select id="progression" class="w-full rounded-lg border border-slate-200 p-2.5 text-sm bg-white focus:ring-2 focus:ring-green-700 focus:outline-none font-medium" onchange="regenerateSheet()">
+          <option value="single" selected>단일 (유형 섞지 않고 그대로)</option>
+          <option value="asc">쉬움 → 어려움 (오름차순)</option>
+          <option value="desc">어려움 → 쉬움 (내림차순)</option>
+          <option value="mix">혼합 (무작위 섞기)</option>
+        </select>
+        <p class="text-xs text-slate-400">단일이 아니면 위에서 고른 옵션을 보고 <b>자동으로 문제 유형을 분석</b>하여 난이도순으로 분배합니다.</p>
+      </div>
+
+      <!-- 연·월 처리 -->
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">달력 연·월 처리</label>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="cursor-pointer border border-slate-200 rounded-lg p-2 flex items-center justify-center gap-1 bg-white hover:bg-slate-50 [&:has(input:checked)]:border-green-700 [&:has(input:checked)]:bg-green-50">
+            <input type="radio" name="year-mode" value="real" class="sr-only" onchange="onYearModeChange()"><span class="text-xs font-semibold">실제 연도</span>
+          </label>
+          <label class="cursor-pointer border border-slate-200 rounded-lg p-2 flex items-center justify-center gap-1 bg-white hover:bg-slate-50 [&:has(input:checked)]:border-green-700 [&:has(input:checked)]:bg-green-50">
+            <input type="radio" name="year-mode" value="abstract" class="sr-only" checked onchange="onYearModeChange()"><span class="text-xs font-semibold">추상 달력</span>
+          </label>
+        </div>
+        <div id="ym-inputs" class="flex items-center justify-between gap-2 bg-slate-50 border border-slate-100 rounded-lg p-2">
+          <div class="flex items-center gap-1.5">
+            <label class="text-xs text-slate-600 shrink-0">연</label>
+            <input type="number" id="year-input" min="2000" max="2099" value="2026" class="w-16 text-xs text-center border border-slate-200 rounded px-1 py-1" onchange="regenerateSheet()">
+            <label class="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer"><input type="checkbox" id="opt-randyear" class="w-3.5 h-3.5 text-green-700 rounded" onchange="regenerateSheet()">무작위</label>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <label class="text-xs text-slate-600 shrink-0">월</label>
+            <input type="number" id="month-input" min="1" max="12" value="6" class="w-14 text-xs text-center border border-slate-200 rounded px-1 py-1" onchange="regenerateSheet()">
+            <label class="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer"><input type="checkbox" id="opt-randmonth" class="w-3.5 h-3.5 text-green-700 rounded" checked onchange="regenerateSheet()">무작위</label>
+          </div>
+        </div>
+        <label id="holiday-row" class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer bg-slate-50 border border-slate-100 rounded-lg p-2">
+          <input type="checkbox" id="opt-holiday" class="w-3.5 h-3.5 text-green-700 rounded" onchange="regenerateSheet()"><span><b>공휴일 표시</b> <span class="text-[10px] text-slate-400">(양력 공휴일을 빨갛게)</span></span>
+        </label>
+      </div>
+
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">세부 옵션 설정 <span class="text-[11px] font-normal text-slate-400">(표기·달력 표시 방식)</span></label>
+        <div class="space-y-2 bg-slate-50 border border-slate-100 rounded-lg p-3">
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-monstart" class="w-4 h-4 text-green-700 rounded" onchange="regenerateSheet()"><span><b>월요일 시작</b> 달력 (기본: 일요일 시작)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-weekend" class="w-4 h-4 text-green-700 rounded" checked onchange="regenerateSheet()"><span><b>주말 색상</b> 표시 (토·일)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-hanja" class="w-4 h-4 text-green-700 rounded" onchange="regenerateSheet()"><span>요일 <b>한자</b> 표기 (月·火·水)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-english" class="w-4 h-4 text-green-700 rounded" onchange="regenerateSheet()"><span>요일 <b>영어</b> 표기 (Sun·Mon·Tue)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-big" class="w-4 h-4 text-green-700 rounded" onchange="regenerateSheet()"><span><b>큰 글씨·큰 달력</b> <span class="text-[10px] text-green-700 font-semibold">(6문제까지 무난)</span></span>
+          </label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-boldkey" class="w-4 h-4 text-green-700 rounded" checked onchange="regenerateSheet()"><span>문제의 <b>중요 부분 볼드 처리</b> (끄면 균일한 글씨)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-markcount" class="w-4 h-4 text-green-700 rounded" onchange="regenerateSheet()"><span><b>문제에 주어진 날짜에 동그라미</b> 표시 <span class="text-[10px] text-slate-400">(풀이 도움용)</span></span>
+          </label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-spill" class="w-4 h-4 text-green-700 rounded" onchange="regenerateSheet()"><span><b>이전·다음 달 날짜</b>를 회색으로 채워서 표시</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-xs text-slate-600 cursor-pointer">
+            <input type="checkbox" id="opt-worksheet" class="w-4 h-4 text-green-700 rounded" onchange="regenerateSheet()"><span><b>워크시트형</b> <span class="text-[10px] text-slate-400">(페이지마다 큰 달력 1개 + 그 달 문제 모음)</span></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 문항 방식 -->
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">문제 문항 방식 (중복 선택)</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" id="style-subjective" checked class="w-4 h-4 text-green-700 border-slate-300 rounded focus:ring-green-700" onchange="regenerateSheet()"><span>주관식 (일반 서술형)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" id="style-objective" checked class="w-4 h-4 text-green-700 border-slate-300 rounded focus:ring-green-700" onchange="regenerateSheet()"><span>객관식 (4지 선다형)</span>
+          </label>
+          <label class="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" id="style-narrative" checked class="w-4 h-4 text-green-700 border-slate-300 rounded focus:ring-green-700" onchange="regenerateSheet()"><span>문장제 (실생활 맥락 시나리오)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 세부 유형 (대폭 확장) -->
+      <div class="space-y-3">
+        <label class="block text-sm font-semibold text-slate-700">수학 문제 세부 유형</label>
+        <p class="text-[11px] text-slate-400 leading-relaxed">각 항목 오른쪽 숫자(1~5)로 <b>출제 비중</b>을, 영역 제목 옆 <b>전체</b> 체크로 해당 영역을 한 번에 켜고 끌 수 있어요.</p>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">기초·요일</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-toggle w-3.5 h-3.5 text-green-700 rounded" data-grp="grp-basic" checked onchange="toggleGroup(this,'grp-basic')">전체</label></div>
+        <div id="grp-basic" class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="relday" checked onchange="regenerateSheet()"><span>어제·오늘·내일 (그저께·모레)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="dowseq" checked onchange="regenerateSheet()"><span>요일 순서 계산 (○요일 N일 뒤)</span></label>
+        </div>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">달력 읽기</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-toggle w-3.5 h-3.5 text-green-700 rounded" data-grp="grp-read" checked onchange="toggleGroup(this,'grp-read')">전체</label></div>
+        <div id="grp-read" class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="read" checked onchange="regenerateSheet()"><span>날짜·요일 읽기</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="ordinalDay" checked onchange="regenerateSheet()"><span>몇 번째·몇째 주 요일</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="weekendCount" checked onchange="regenerateSheet()"><span>한 달의 특정 요일 수 세기</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="fillCal" checked onchange="regenerateSheet()"><span>달력 빈칸 채우기</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="pattern_line" checked onchange="regenerateSheet()"><span>달력 조각의 규칙 (가로 +1 · 세로 +7)</span></label>
+        </div>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">단위 관계</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-toggle w-3.5 h-3.5 text-green-700 rounded" data-grp="grp-unit" checked onchange="toggleGroup(this,'grp-unit')">전체</label></div>
+        <div id="grp-unit" class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="unit_dh" checked onchange="regenerateSheet()"><span>일 ↔ 시간 (1일=24시간)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="unit_wd" checked onchange="regenerateSheet()"><span>주 ↔ 일 (1주일=7일)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="unit_dm" checked onchange="regenerateSheet()"><span>일 ↔ 개월 (1개월=30일)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="unit_my" checked onchange="regenerateSheet()"><span>개월 ↔ 년 (1년=12개월)</span></label>
+        </div>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">날짜 계산</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-toggle w-3.5 h-3.5 text-green-700 rounded" data-grp="grp-calc" checked onchange="toggleGroup(this,'grp-calc')">전체</label></div>
+        <div id="grp-calc" class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="add_d" checked onchange="regenerateSheet()"><span>며칠 후·전 (일 단위)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="add_w" checked onchange="regenerateSheet()"><span>몇 주 후·전 (주 단위)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="add_m" checked onchange="regenerateSheet()"><span>몇 개월 후·전 (개월 단위)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="nthday" checked onchange="regenerateSheet()"><span>며칠째 (순서일 계산)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="recurring" checked onchange="regenerateSheet()"><span>반복 일정 (N일마다)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="compare" checked onchange="regenerateSheet()"><span>날짜 비교·순서 나열</span></label>
+        </div>
+
+        <div class="flex items-center justify-between pt-1"><span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">개념·판별</span><label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" class="group-toggle w-3.5 h-3.5 text-green-700 rounded" data-grp="grp-concept" checked onchange="toggleGroup(this,'grp-concept')">전체</label></div>
+        <div id="grp-concept" class="grid grid-cols-1 gap-2 border border-slate-100 p-2 rounded-lg bg-slate-50">
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="daysInMonth" checked onchange="regenerateSheet()"><span>각 달의 날수 (큰 달·작은 달)</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="season" checked onchange="regenerateSheet()"><span>계절과 월</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="leap" checked onchange="regenerateSheet()"><span>윤년·평년 판별</span></label>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer"><input type="checkbox" class="type-checkbox w-3.5 h-3.5 text-green-700 rounded" value="agegrade" checked onchange="regenerateSheet()"><span>나이 계산 (만 나이·나이 차)</span></label>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 flex flex-col gap-2">
+        <button onclick="regenerateSheet()" class="w-full bg-slate-900 text-white font-bold py-3 px-4 rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i> 새로운 문제 생성하기
+        </button>
+        <button onclick="toggleAnswers()" id="toggle-ans-btn" class="w-full bg-green-50 border border-green-200 text-green-700 font-semibold py-2.5 px-4 rounded-xl hover:bg-green-100 transition flex items-center justify-center gap-2">
+          <i data-lucide="eye" id="eye-icon" class="w-4 h-4"></i> <span id="ans-text">답안 정답 보이기</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 미리보기 -->
+    <section class="flex-1 flex flex-col gap-6">
+      <div id="print-control-toolbar" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center no-print">
+        <span class="text-sm font-medium text-slate-500">실시간 학습지 미리보기</span>
+        <select id="qr-mode" title="QR에 무엇을 담을지" onchange="QR_MODE=this.value;makeQRCodes();" class="ml-auto mr-2 rounded-lg border border-slate-200 px-2 py-2 text-xs bg-white font-semibold text-slate-600"><option value="link">QR: 정답지 페이지 열기</option><option value="text">QR: 정답 글자 (로그인 불필요)</option></select>
+          <button onclick="printSheet()" class="bg-green-700 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md">
+          <i data-lucide="printer" class="w-5 h-5"></i> 인쇄 및 PDF 저장
+        </button>
+      </div>
+      <div id="print-pages-container" class="space-y-6"></div>
+    </section>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs mt-12 no-print border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 space-y-2">
+      <p>본 학습지는 2015·2022 개정 교육과정 [2수03-04] 시간 단위 관계 성취기준을 준수합니다.</p>
+      <p>© 2026 달력보기 맞춤형 학습지 · <b class="text-slate-200">made by 특수교사 슬옹쌤</b></p>
+    </div>
+  </footer>
+
+  <script>
+    // ── QR 정답지 설정: 스캔하면 이 생성기의 정답지 화면이 바로 열려요 ──
+    const ANSWER_URL = 'https://teacher-sulong.github.io/worksheets/calendar.html';
+    let QR_MODE = 'link';
+    // 정답지 화면: 휴대폰 화면 폭에 학습지 한 장이 통째로 보이도록 맞춤
+    function fitAnswerView(){ if(!document.body.classList.contains('answer-view'))return; var c=document.getElementById('print-pages-container'); if(!c)return; c.style.zoom=Math.min(1,(window.innerWidth-12)/850); }
+    window.addEventListener('resize', fitAnswerView);
+    window.addEventListener('hashchange', function () { if (/^#k[-=]/.test(location.hash)) location.reload(); });
+    // ───────── 시드 난수 ─────────
+    function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+    let rng = Math.random;
+    function randInt(a,b){return Math.floor(rng()*(b-a+1))+a;}
+    function pick(arr){return arr[Math.floor(rng()*arr.length)];}
+
+    // ───────── 상태 ─────────
+    let config = {
+      pages:2, questionsPerPage:9, progression:'single',
+      yearMode:'abstract', year:2026, randYear:false, month:6, randMonth:true,
+      monStart:false, weekend:true, hanja:false, english:false, bigMode:false, boldKey:true,
+      markCount:false, spillDates:false, holidays:false, worksheet:false,
+      styles:['subjective','objective','narrative'],
+      types:['read','ordinalDay','weekendCount','fillCal','pattern_line','unit_wd','unit_dm','unit_my','unit_dh','add_d','add_w','add_m','daysInMonth','season','leap','relday','dowseq','compare','nthday','recurring','agegrade'],
+      typeWeights:{}, dateStr:''
+    };
+    let generatedPages=[]; let pageSeeds=[]; let showAnswers=false; let answerViewMode=false;
+
+    const KOREAN_TYPES={read:'날짜·요일 읽기',ordinalDay:'몇 번째 요일',weekendCount:'요일 수 세기',fillCal:'빈칸 채우기',pattern_line:'달력 규칙',unit_wd:'주↔일',unit_dm:'일↔개월',unit_my:'개월↔년',unit_dh:'일↔시간',add_d:'며칠 후·전',add_w:'몇 주 후·전',add_m:'몇 개월 후·전',daysInMonth:'각 달의 날수',season:'계절과 월',leap:'윤년·평년',relday:'어제·오늘·내일',dowseq:'요일 순서',compare:'날짜 비교·나열',nthday:'며칠째(순서일)',recurring:'반복 일정',agegrade:'나이 계산'};
+    const KOREAN_STYLES={subjective:'주관식',objective:'객관식',narrative:'문장제'};
+    const DAY_KO=['일','월','화','수','목','금','토'];
+    const DAY_HANJA=['日','月','火','水','木','金','土'];
+    const DAY_EN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const DAY_EN_FULL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const ORD_KO=['','첫째','둘째','셋째','넷째','다섯째','여섯째'];
+    const BASE_DIM=[31,28,31,30,31,30,31,31,30,31,30,31];
+    const NAMES=['이준','하준','도윤','서준','은우','시우','유준','주원','서윤','서아','이서','지유','하린','아린','시아','하은','소율','채원'];
+    const SEASONS={3:'봄',4:'봄',5:'봄',6:'여름',7:'여름',8:'여름',9:'가을',10:'가을',11:'가을',12:'겨울',1:'겨울',2:'겨울'};
+    const HOLIDAYS={'1-1':'신정','3-1':'삼일절','5-5':'어린이날','6-6':'현충일','8-15':'광복절','10-3':'개천절','10-9':'한글날','12-25':'성탄절'};
+    function holidayName(m,d){return (config.holidays&&config.yearMode==='real')?HOLIDAYS[m+'-'+d]:null;}
+
+    // ───────── 달력 유틸 ─────────
+    function isLeap(y){return (y%4===0&&y%100!==0)||y%400===0;}
+    function dim(y,m){return (m===2&&isLeap(y))?29:BASE_DIM[m-1];}
+    function dowOf(y,m,d){return new Date(y,m-1,d).getDay();}
+    function addDays(y,m,d,n){const dt=new Date(y,m-1,d+n);return {y:dt.getFullYear(),m:dt.getMonth()+1,d:dt.getDate(),dow:dt.getDay()};}
+    function addMonths(y,m,d,n){let mm=m-1+n,yy=y+Math.floor(mm/12);mm=((mm%12)+12)%12;const dd=Math.min(d,dim(yy,mm+1));return {y:yy,m:mm+1,d:dd,dow:dowOf(yy,mm+1,dd)};}
+    function diffDays(y1,m1,d1,y2,m2,d2){return Math.round((new Date(y2,m2-1,d2)-new Date(y1,m1-1,d1))/86400000);}
+    let wsFixed=null;
+    function pickYear(){if(wsFixed)return wsFixed.y;if(config.yearMode==='abstract'||config.randYear)return randInt(2018,2032);return config.year;}
+    function pickMonth(){if(wsFixed)return wsFixed.m;if(config.yearMode!=='real')return randInt(1,12);return config.randMonth?randInt(1,12):config.month;}
+    function dowName(dw,forAnswer){if(config.english)return forAnswer?DAY_EN_FULL[dw]:DAY_EN[dw];if(config.hanja&&!forAnswer)return DAY_HANJA[dw];return DAY_KO[dw]+(forAnswer?'요일':'');}
+    function dayWordKo(dw){return config.english?DAY_EN_FULL[dw]:DAY_KO[dw]+'요일';} // 문제 문장 안 요일 명칭
+    function yearTxt(y){return config.yearMode==='real'?`${y}년 `:'';}
+
+    // ───────── 조사 ─────────
+    function hasBatchim(w){if(!w)return false;const c=w.charCodeAt(w.length-1);if(c<0xac00||c>0xd7a3)return false;return (c-0xac00)%28>0;}
+    function getDisplayName(n){return n+(hasBatchim(n)?'이':'');}
+    function josaW(w,t){const b=hasBatchim(w);if(t==='eun')return b?'은':'는';if(t==='i')return b?'이':'가';if(t==='eul')return b?'을':'를';return '';}
+    function selJosa(n,t){return josaW(getDisplayName(n),t);}
+    function fillTpl(tpl,raw,extra={}){let r=tpl;const map={name:getDisplayName(raw),josaEun:selJosa(raw,'eun'),josaI:selJosa(raw,'i'),josaEul:selJosa(raw,'eul'),...extra};for(const[k,v]of Object.entries(map))r=r.replaceAll(`{${k}}`,v);return r;}
+
+    // ───────── 시나리오 ─────────
+    const NARR={
+      add:[
+        "{name}{josaEun} 강낭콩 씨앗을 심었습니다.","{name}{josaI} 방울토마토 모종을 화분에 심었습니다.","{name}{josaEun} 텃밭에 상추를 심었습니다.","{name}{josaI} 해바라기를 기르기 시작했습니다.","{name}{josaEun} 줄넘기 연습을 시작했습니다.","{name}{josaI} 매일 일기 쓰기를 시작했습니다.","{name}{josaEun} 독서 마라톤에 참여하기 시작했습니다.","{name}{josaI} 영어 단어 외우기 도전을 시작했습니다.","{name}{josaEun} 강아지 배변 훈련을 시작했습니다.","{name}{josaI} 비타민을 매일 챙겨 먹기 시작했습니다.","{name}{josaEun} 방과후 미술 수업을 신청했습니다.","{name}{josaI} 우유 정기 배달을 신청했습니다.","{name}{josaEun} 자전거 타기 연습을 시작했습니다.","{name}{josaI} 리코더 연습을 시작했습니다.","{name}{josaEun} 수영 강습을 등록했습니다.","{name}{josaI} 태권도 도장에 다니기 시작했습니다.","{name}{josaEun} 피아노 학원에 다니기 시작했습니다.","{name}{josaI} 매일 줄넘기 100개 도전을 시작했습니다.","{name}{josaEun} 사물함을 매일 정리하기로 했습니다.","{name}{josaI} 양치 기록표를 쓰기 시작했습니다.","{name}{josaEun} 용돈 모으기를 시작했습니다.","{name}{josaI} 종이접기 도전을 시작했습니다.","{name}{josaEun} 매일 책 한 권 읽기를 시작했습니다.","우리 반은 학급 텃밭 가꾸기를 시작했습니다.","우리 반은 칠판 정리 당번을 정해 운영하기 시작했습니다.","{name}{josaEun} 강아지 산책 도우미를 맡기로 했습니다.","{name}{josaI} 식물 관찰 일지를 쓰기 시작했습니다.","{name}{josaEun} 매일 줄넘기와 달리기를 하기로 했습니다."
+      ],
+      read1:[
+        "{name}{josaEun} 가족 여행 날짜를 <b>{y}{m}월 {day}일</b>로 정했습니다. 이 날은 무슨 요일입니까?","{name}{josaI} 친구 생일인 <b>{y}{m}월 {day}일</b>을 달력에 표시했습니다. 이 날은 무슨 요일입니까?","우리 반 현장체험학습은 <b>{y}{m}월 {day}일</b>입니다. 이 날은 무슨 요일입니까?","{name}{josaEun} 받아쓰기 시험 날을 <b>{y}{m}월 {day}일</b>로 안내받았습니다. 이 날은 무슨 요일입니까?","{name}{josaI} 치과 예약을 <b>{y}{m}월 {day}일</b>에 잡았습니다. 이 날은 무슨 요일입니까?","도서관 책 반납일이 <b>{y}{m}월 {day}일</b>입니다. 이 날은 무슨 요일입니까?","학예회가 <b>{y}{m}월 {day}일</b>에 열립니다. 이 날은 무슨 요일입니까?","{name}{josaEun} 태권도 승급 심사일을 <b>{y}{m}월 {day}일</b>로 받았습니다. 이 날은 무슨 요일입니까?","운동회 날이 <b>{y}{m}월 {day}일</b>입니다. 이 날은 무슨 요일입니까?","{name}{josaI} 할머니 생신인 <b>{y}{m}월 {day}일</b>을 적어 두었습니다. 이 날은 무슨 요일입니까?","단원평가가 <b>{y}{m}월 {day}일</b>에 있습니다. 이 날은 무슨 요일입니까?","{name}{josaEun} 피아노 발표회 날인 <b>{y}{m}월 {day}일</b>을 기다립니다. 이 날은 무슨 요일입니까?","방학식이 <b>{y}{m}월 {day}일</b>입니다. 이 날은 무슨 요일입니까?","우리 반 학급 사진 촬영은 <b>{y}{m}월 {day}일</b>입니다. 이 날은 무슨 요일입니까?","{name}{josaI} 축구 시합 날인 <b>{y}{m}월 {day}일</b>을 손꼽아 기다립니다. 이 날은 무슨 요일입니까?","과학 전시회가 <b>{y}{m}월 {day}일</b>에 시작됩니다. 이 날은 무슨 요일입니까?","{name}{josaEun} 동생 백일인 <b>{y}{m}월 {day}일</b>을 달력에 적었습니다. 이 날은 무슨 요일입니까?","학교 도서 바자회가 <b>{y}{m}월 {day}일</b>에 열립니다. 이 날은 무슨 요일입니까?","{name}{josaI} 수영 대회 날인 <b>{y}{m}월 {day}일</b>을 표시했습니다. 이 날은 무슨 요일입니까?","가족 캠핑을 <b>{y}{m}월 {day}일</b>에 가기로 했습니다. 이 날은 무슨 요일입니까?","{name}{josaEun} 미술 대회 날인 <b>{y}{m}월 {day}일</b>을 기억해 두었습니다. 이 날은 무슨 요일입니까?","우리 반 모둠 발표는 <b>{y}{m}월 {day}일</b>입니다. 이 날은 무슨 요일입니까?","{name}{josaI} 병원 진료 예약일인 <b>{y}{m}월 {day}일</b>을 적었습니다. 이 날은 무슨 요일입니까?","음악회가 <b>{y}{m}월 {day}일</b>에 열립니다. 이 날은 무슨 요일입니까?"
+      ],
+      read5:[
+        "{name}{josaEun} 매주 {dw}마다 수영을 배웁니다. <b>{y}{m}월 {day}일</b>에 수영을 했다면, 바로 다음 수영 날은 며칠입니까?","{name}{josaI} 매주 {dw}마다 피아노 학원에 갑니다. <b>{y}{m}월 {day}일</b> 다음에 가는 날은 며칠입니까?","{name}{josaEun} 매주 {dw}마다 태권도장에 갑니다. <b>{y}{m}월 {day}일</b> 다음에 가는 날은 며칠입니까?","{name}{josaI} 매주 {dw}마다 도서관에서 책을 읽습니다. <b>{y}{m}월 {day}일</b> 다음 도서관 가는 날은 며칠입니까?","{name}{josaEun} 매주 {dw}마다 축구 교실에 참여합니다. <b>{y}{m}월 {day}일</b> 다음 축구 날은 며칠입니까?","{name}{josaI} 매주 {dw}마다 할머니 댁에 갑니다. <b>{y}{m}월 {day}일</b> 다음에 가는 날은 며칠입니까?","{name}{josaEun} 매주 {dw}마다 미술 학원에 갑니다. <b>{y}{m}월 {day}일</b> 다음 미술 수업은 며칠입니까?","우리 반은 매주 {dw}마다 독서 시간을 갖습니다. <b>{y}{m}월 {day}일</b> 다음 독서 시간은 며칠입니까?","{name}{josaI} 매주 {dw}마다 발레 수업을 듣습니다. <b>{y}{m}월 {day}일</b> 다음 수업은 며칠입니까?","{name}{josaEun} 매주 {dw}마다 환경 봉사활동을 합니다. <b>{y}{m}월 {day}일</b> 다음 봉사 날은 며칠입니까?","{name}{josaI} 매주 {dw}마다 바이올린 레슨을 받습니다. <b>{y}{m}월 {day}일</b> 다음 레슨은 며칠입니까?","{name}{josaEun} 매주 {dw}마다 주산 학원에 갑니다. <b>{y}{m}월 {day}일</b> 다음에 가는 날은 며칠입니까?","우리 가족은 매주 {dw}마다 등산을 갑니다. <b>{y}{m}월 {day}일</b> 다음 등산 날은 며칠입니까?","{name}{josaI} 매주 {dw}마다 클라이밍을 배웁니다. <b>{y}{m}월 {day}일</b> 다음 수업은 며칠입니까?"
+      ],
+      count:[
+        "{name}{josaEun} 매주 {dw}마다 수영을 배웁니다. <b>{y}{m}월</b>에 수영하는 날은 모두 몇 번입니까?","{name}{josaI} 매주 {dw}마다 피아노 학원에 갑니다. <b>{y}{m}월</b>에 가는 날은 모두 몇 번입니까?","{name}{josaEun} 매주 {dw}마다 봉사 활동을 합니다. <b>{y}{m}월</b>에 봉사하는 날은 모두 몇 번입니까?","우리 가족은 매주 {dw}마다 등산을 갑니다. <b>{y}{m}월</b>에 등산하는 날은 모두 몇 번입니까?","{name}{josaEun} 매주 {dw}마다 일기 검사를 받습니다. <b>{y}{m}월</b>에 검사받는 날은 모두 몇 번입니까?","{name}{josaI} 매주 {dw}마다 줄넘기 급수에 도전합니다. <b>{y}{m}월</b>에 도전하는 날은 모두 몇 번입니까?","우리 반은 매주 {dw}마다 우유 당번을 정합니다. <b>{y}{m}월</b>의 {dw}은 모두 몇 번입니까?","{name}{josaEun} 매주 {dw}마다 학원 차를 탑니다. <b>{y}{m}월</b>에 타는 날은 모두 몇 번입니까?","{name}{josaI} 매주 {dw}마다 할아버지와 산책합니다. <b>{y}{m}월</b>에 산책하는 날은 모두 몇 번입니까?","{name}{josaEun} 매주 {dw}마다 미술 학원에 갑니다. <b>{y}{m}월</b>에 가는 날은 모두 몇 번입니까?","우리 반은 매주 {dw}마다 청소 당번을 바꿉니다. <b>{y}{m}월</b>의 {dw}은 모두 몇 번입니까?","{name}{josaI} 매주 {dw}마다 태권도장에 갑니다. <b>{y}{m}월</b>에 가는 날은 모두 몇 번입니까?"
+      ],
+      wd2d:[
+        "1주일은 7일입니다. <b>{w}주일</b>은 모두 며칠입니까?","{name}{josaEun} <b>{w}주일</b>이 며칠인지 세어 보았습니다. 모두 며칠입니까?","겨울 방학이 <b>{w}주일</b> 동안 이어집니다. 방학 기간은 모두 며칠입니까?","과학 캠프가 <b>{w}주일</b> 동안 열립니다. 캠프 기간은 모두 며칠입니까?","독서 행사 기간이 <b>{w}주일</b>입니다. 모두 며칠입니까?","방과후 코딩 수업이 <b>{w}주일</b> 동안 진행됩니다. 전체 기간은 모두 며칠입니까?","<b>{w}주일</b>은 며칠과 같습니까? (1주일 = 7일)","{name}{josaI} 여행을 <b>{w}주일</b> 동안 다녀왔습니다. 여행 기간은 모두 며칠입니까?"
+      ],
+      d2wd:[
+        "<b>{dd}일</b>은 몇 주 며칠입니까? (1주일 = 7일)","{name}{josaEun} <b>{dd}일</b>을 '몇 주 며칠'로 나타내려고 합니다. 몇 주 며칠입니까?","겨울 방학이 <b>{dd}일</b> 동안 이어집니다. 몇 주 며칠입니까?","전시회가 <b>{dd}일</b> 동안 열립니다. 이 기간은 몇 주 며칠입니까?","어떤 행사가 <b>{dd}일</b> 동안 이어졌습니다. 몇 주 며칠입니까?","{name}{josaI} 여행을 <b>{dd}일</b> 동안 다녀왔습니다. 이 기간은 몇 주 며칠입니까?"
+      ],
+      y2mo:[
+        "1년은 12개월입니다. <b>{y}년</b>은 모두 몇 개월입니까?","{name}{josaEun} <b>{y}년</b>이 몇 개월인지 세어 보았습니다. 모두 몇 개월입니까?","동생이 태어난 지 <b>{y}년</b>이 되었습니다. 모두 몇 개월입니까?","{name}{josaI} 피아노를 배운 지 <b>{y}년</b>이 되었습니다. 모두 몇 개월입니까?","우리 집에서 강아지를 기른 지 <b>{y}년</b>이 되었습니다. 모두 몇 개월입니까?","{name}{josaEun} 이 학교에 입학한 지 <b>{y}년</b>이 되었습니다. 모두 몇 개월입니까?","<b>{y}년</b>은 몇 개월과 같습니까? (1년 = 12개월)","{name}{josaI} 태권도를 배운 지 <b>{y}년</b>이 되었습니다. 모두 몇 개월입니까?"
+      ],
+      d2h:[
+        "하루는 24시간입니다. <b>{dd}일</b>은 모두 몇 시간입니까?","{name}{josaEun} <b>{dd}일</b>이 몇 시간인지 계산해 보았습니다. (하루는 24시간) 모두 몇 시간입니까?","<b>{dd}일</b>은 몇 시간과 같습니까? (하루 = 24시간)","어떤 행사가 <b>{dd}일</b> 동안 쉬지 않고 이어집니다. 이 기간은 모두 몇 시간입니까?","{name}{josaI} 날수를 시간으로 바꾸려고 합니다. <b>{dd}일</b>은 모두 몇 시간입니까? (하루는 24시간)","우주선이 <b>{dd}일</b> 동안 쉬지 않고 날아갑니다. 이 기간은 모두 몇 시간입니까?"
+      ],
+      days:[
+        "{name}{josaEun} 이번 달의 날수를 세어 보았습니다. <b>{y}{m}월</b>은 며칠까지 있습니까?","{name}{josaI} <b>{y}{m}월</b> 달력을 넘겨 보았습니다. 이 달은 며칠까지 있습니까?","이번 달은 <b>{y}{m}월</b>입니다. 며칠까지 있습니까?","{name}{josaEun} <b>{y}{m}월</b>의 마지막 날짜가 궁금합니다. 이 달은 며칠까지 있습니까?","달력에서 <b>{y}{m}월</b>을 보고 있습니다. 며칠까지 있습니까?","{name}{josaI} 용돈 기입장에 <b>{y}{m}월</b>을 적었습니다. 이 달은 며칠까지 있습니까?","{name}{josaEun} 다음 달 계획표를 만들려고 합니다. <b>{y}{m}월</b>은 며칠까지 있습니까?"
+      ],
+      season:[
+        "{name}{josaI} 달력을 넘기다 <b>{m}월</b>을 보았습니다. {m}월은 무슨 계절입니까?","{name}{josaEun} <b>{m}월</b>에 가족 여행을 갑니다. {m}월은 무슨 계절입니까?","운동회가 <b>{m}월</b>에 열립니다. {m}월은 무슨 계절입니까?","{name}{josaI} <b>{m}월</b>에 태어났습니다. {m}월은 무슨 계절입니까?","우리 반 소풍은 <b>{m}월</b>입니다. {m}월은 무슨 계절입니까?","{name}{josaEun} <b>{m}월</b>에 할머니 댁에 갑니다. {m}월은 무슨 계절입니까?","현장체험학습이 <b>{m}월</b>에 있습니다. {m}월은 무슨 계절입니까?","{name}{josaI} <b>{m}월</b>에 캠핑을 갑니다. {m}월은 무슨 계절입니까?"
+      ],
+      rel:[
+        "{name}{josaI} 달력에서 <b>오늘</b>을 {y}{m}월 {day}일로 표시했습니다. <b>{rel}</b>{rj} 며칠입니까?","{name}{josaEun} 오늘이 {y}{m}월 {day}일이라고 적었습니다. <b>{rel}</b>{rj} 며칠입니까?","오늘은 {y}{m}월 {day}일입니다. <b>{rel}</b>{rj} 며칠입니까?","{name}{josaI} 일기장에 오늘 날짜를 {y}{m}월 {day}일로 썼습니다. <b>{rel}</b>{rj} 며칠입니까?","선생님께서 오늘이 {y}{m}월 {day}일이라고 말씀하셨습니다. <b>{rel}</b>{rj} 며칠입니까?","알림장에 오늘이 {y}{m}월 {day}일로 적혀 있습니다. <b>{rel}</b>{rj} 며칠입니까?","{name}{josaEun} 오늘 {y}{m}월 {day}일에 강아지를 처음 만났습니다. <b>{rel}</b>{rj} 며칠입니까?","우리 반 달력에 오늘이 {y}{m}월 {day}일로 표시되어 있습니다. <b>{rel}</b>{rj} 며칠입니까?"
+      ],
+      dow:[
+        "어떤 날이 <b>{dw}</b>입니다. 그날부터 <b>{n}일 {dir}</b>{dj} 무슨 요일입니까?","오늘이 <b>{dw}</b>이라면, 오늘부터 <b>{n}일 {dir}</b>{dj} 무슨 요일입니까?","{name}{josaI} 적어 둔 날이 <b>{dw}</b>입니다. 그날부터 <b>{n}일 {dir}</b>{dj} 무슨 요일입니까?","현장학습 날이 <b>{dw}</b>입니다. 그날부터 <b>{n}일 {dir}</b>{dj} 무슨 요일입니까?","{name}{josaEun} 운동을 <b>{dw}</b>에 시작했습니다. 그날부터 <b>{n}일 {dir}</b>{dj} 무슨 요일입니까?","시험 보는 날이 <b>{dw}</b>입니다. 그날부터 <b>{n}일 {dir}</b>{dj} 무슨 요일입니까?","생일이 <b>{dw}</b>입니다. 그날부터 <b>{n}일 {dir}</b>{dj} 무슨 요일입니까?","{name}{josaI} 여행을 떠난 날이 <b>{dw}</b>입니다. 그날부터 <b>{n}일 {dir}</b>{dj} 무슨 요일입니까?"
+      ],
+      nthF:[
+        "{name}{josaI} <b>{y}{m}월 {s}일</b>부터 독서 마라톤을 시작했습니다. <b>{n}일째</b> 되는 날은 며칠입니까?","{name}{josaEun} <b>{y}{m}월 {s}일</b>부터 식물 관찰을 시작했습니다. 관찰 <b>{n}일째</b> 되는 날은 며칠입니까?","방학 숙제를 <b>{y}{m}월 {s}일</b>부터 시작했습니다. <b>{n}일째</b> 되는 날은 며칠입니까?","{name}{josaI} <b>{y}{m}월 {s}일</b>부터 줄넘기 도전을 시작했습니다. <b>{n}일째</b> 되는 날은 며칠입니까?","{name}{josaEun} <b>{y}{m}월 {s}일</b>부터 영어 단어 외우기를 시작했습니다. <b>{n}일째</b> 되는 날은 며칠입니까?","체험 캠프가 <b>{y}{m}월 {s}일</b>부터 시작됩니다. <b>{n}일째</b> 되는 날은 며칠입니까?","{name}{josaI} <b>{y}{m}월 {s}일</b>부터 매일 피아노를 연습합니다. <b>{n}일째</b> 되는 날은 며칠입니까?","{name}{josaEun} <b>{y}{m}월 {s}일</b>부터 양치 기록을 시작했습니다. <b>{n}일째</b> 되는 날은 며칠입니까?","독서 행사가 <b>{y}{m}월 {s}일</b>부터 열립니다. <b>{n}일째</b> 되는 날은 며칠입니까?","{name}{josaI} <b>{y}{m}월 {s}일</b>부터 매일 달리기를 합니다. <b>{n}일째</b> 되는 날은 며칠입니까?"
+      ],
+      nthR:[
+        "어떤 행사가 <b>{y}{m}월 {t}일</b>에 <b>{n}일째</b>를 맞았습니다. 행사가 시작한 날은 며칠입니까?","{name}{josaI} 글쓰기 연습 <b>{n}일째</b> 되는 날이 <b>{y}{m}월 {t}일</b>이었습니다. 시작한 날은 며칠입니까?","독서 마라톤 <b>{n}일째</b>가 <b>{y}{m}월 {t}일</b>이라면, 시작한 날은 며칠입니까?","{name}{josaEun} 운동 <b>{n}일째</b> 되는 날이 <b>{y}{m}월 {t}일</b>입니다. 시작한 날은 며칠입니까?","줄넘기 도전 <b>{n}일째</b>가 <b>{y}{m}월 {t}일</b>입니다. 시작한 날은 며칠입니까?","{name}{josaI} 식물 관찰 <b>{n}일째</b> 되는 날이 <b>{y}{m}월 {t}일</b>입니다. 시작한 날은 며칠입니까?","체험 학습 <b>{n}일째</b>가 <b>{y}{m}월 {t}일</b>이라면, 시작한 날은 며칠입니까?"
+      ],
+      recur:[
+        "{name}{josaEun} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 화분에 물을 줍니다. <b>{k}번째</b>로 물 주는 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>","{name}{josaI} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 영양제를 먹습니다. <b>{k}번째</b>로 먹는 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>","{name}{josaEun} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 줄넘기를 합니다. <b>{k}번째</b> 줄넘기 하는 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>","{name}{josaI} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 도서관에 갑니다. <b>{k}번째</b>로 가는 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>","{name}{josaEun} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 강아지를 목욕시킵니다. <b>{k}번째</b> 목욕 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>","{name}{josaI} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 재활용을 분리배출합니다. <b>{k}번째</b> 배출하는 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>","{name}{josaEun} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 텃밭 잡초를 뽑습니다. <b>{k}번째</b> 하는 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>","{name}{josaI} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 할머니께 편지를 씁니다. <b>{k}번째</b> 편지 쓰는 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>","{name}{josaEun} <b>{y}{m}월 {s}일</b>부터 <b>{st}일마다</b> 금붕어 어항을 청소합니다. <b>{k}번째</b> 청소 날은 며칠입니까? <span class='text-[10px] text-slate-400'>(시작한 날이 1번째)</span>"
+      ],
+      age:[
+        "{name}{josaEun} <b>{b}년</b>에 태어났습니다. <b>{n}년</b>이 되면 만 몇 살입니까? <span class='text-[10px] text-slate-400'>(생일은 지난 것으로 봅니다)</span>","{name}{josaI} <b>{b}년</b>생입니다. <b>{n}년</b>에 만 몇 살입니까? <span class='text-[10px] text-slate-400'>(생일은 지난 것으로 봅니다)</span>","{name}{josaEun} <b>{b}년</b>에 태어난 사촌이 있습니다. <b>{n}년</b>에 이 사촌은 만 몇 살입니까? <span class='text-[10px] text-slate-400'>(생일은 지난 것으로 봅니다)</span>","{name}{josaI} <b>{b}년</b>에 태어난 짝꿍이 있습니다. <b>{n}년</b>에 짝꿍은 만 몇 살입니까? <span class='text-[10px] text-slate-400'>(생일은 지난 것으로 봅니다)</span>","{name}{josaEun} <b>{b}년</b>에 태어난 동생이 있습니다. <b>{n}년</b>에 동생은 만 몇 살입니까? <span class='text-[10px] text-slate-400'>(생일은 지난 것으로 봅니다)</span>"
+      ],
+      dm:[
+        "1개월을 30일로 보면, <b>{mo}개월</b>은 모두 며칠입니까?","{name}{josaEun} <b>{mo}개월</b>이 며칠인지 세어 보았습니다. (1개월=30일) 모두 며칠입니까?","어떤 강좌가 <b>{mo}개월</b> 동안 이어집니다. 1개월을 30일로 볼 때 이 기간은 모두 며칠입니까?","<b>{mo}개월</b>은 며칠과 같습니까? (1개월 = 30일)","방학 특강이 <b>{mo}개월</b> 동안 진행됩니다. 1개월을 30일로 볼 때 전체 기간은 모두 며칠입니까?"
+      ],
+      dmR:[
+        "1개월을 30일로 보면, <b>{dd}일</b>은 몇 개월입니까?","{name}{josaI} <b>{dd}일</b>을 개월로 나타내려고 합니다. (1개월=30일) 몇 개월입니까?","<b>{dd}일</b>은 몇 개월과 같습니까? (1개월 = 30일)","어떤 공사가 <b>{dd}일</b> 동안 이어집니다. 1개월을 30일로 볼 때 몇 개월입니까?"
+      ],
+      moR:[
+        "1년은 12개월입니다. <b>{mo}개월</b>은 몇 년 몇 개월입니까?","{name}{josaEun} 태어난 지 <b>{mo}개월</b>이 되었습니다. 몇 년 몇 개월입니까?","<b>{mo}개월</b>은 몇 년 몇 개월과 같습니까? (1년 = 12개월)","{name}{josaI} 이 동네에 산 지 <b>{mo}개월</b>이 되었습니다. 몇 년 몇 개월입니까?"
+      ],
+      ord1:[
+        "{name}{josaEun} <b>{y}{m}월</b>의 <b>{ord} {dw}</b>에 봉사활동을 합니다. 그 날은 며칠입니까?","현장체험학습이 <b>{y}{m}월</b>의 <b>{ord} {dw}</b>입니다. 며칠입니까?","{name}{josaI} <b>{y}{m}월</b>의 <b>{ord} {dw}</b>에 치과에 갑니다. 며칠입니까?","우리 반 학급회의는 <b>{y}{m}월</b>의 <b>{ord} {dw}</b>입니다. 며칠입니까?","{name}{josaEun} <b>{y}{m}월</b>의 <b>{ord} {dw}</b>에 할머니 댁에 갑니다. 며칠입니까?","동아리 모임이 <b>{y}{m}월</b>의 <b>{ord} {dw}</b>에 있습니다. 며칠입니까?","{name}{josaI} <b>{y}{m}월</b>의 <b>{ord} {dw}</b>에 피아노 발표회를 합니다. 며칠입니까?"
+      ],
+      ord3:[
+        "{name}{josaEun} <b>{y}{m}월 {wk} 주 {dw}</b>에 미술 대회에 나갑니다. 며칠입니까?","도서관 휴관일이 <b>{y}{m}월 {wk} 주 {dw}</b>입니다. 며칠입니까?","{name}{josaI} <b>{y}{m}월 {wk} 주 {dw}</b>에 가족 모임이 있습니다. 며칠입니까?","재활용 수거일이 <b>{y}{m}월 {wk} 주 {dw}</b>입니다. 며칠입니까?","우리 반 자리 바꾸기가 <b>{y}{m}월 {wk} 주 {dw}</b>에 있습니다. 며칠입니까?","{name}{josaEun} <b>{y}{m}월 {wk} 주 {dw}</b>에 안과 검진을 받습니다. 며칠입니까?"
+      ],
+      cmp:[
+        "세 친구의 생일이 아래와 같습니다.","우리 반 학급 행사 날짜가 아래와 같습니다.","도서관에서 빌린 책 세 권의 반납일이 아래와 같습니다.","가족 행사 날짜가 아래와 같습니다.","세 가지 숙제의 제출일이 아래와 같습니다.","{name}{josaI} 보고 싶은 전시회 날짜가 아래와 같습니다.","현장체험학습 후보 날짜가 아래와 같습니다."
+      ],
+      leap:[
+        "{name}{josaEun} <b>{by}년</b>에 태어났습니다. <b>{by}년</b>은 윤년입니까, 평년입니까?","올림픽은 윤년에 열립니다. <b>{by}년</b>이 윤년인지 알아보려고 합니다. <b>{by}년</b>은 윤년입니까, 평년입니까?","2월이 29일까지 있는 해를 윤년이라고 합니다. <b>{by}년</b>은 윤년입니까, 평년입니까?","{name}{josaI} 달력에서 <b>{by}년</b> 2월을 찾아보았습니다. <b>{by}년</b>은 윤년입니까, 평년입니까?","{name}{josaEun} <b>{by}년</b>의 2월이 며칠까지 있는지 궁금합니다. <b>{by}년</b>은 윤년입니까, 평년입니까?"
+      ]
+    };
+
+    // ───────── 객관식 보기 ─────────
+    function isWeekdayAns(a){return DAY_KO.map(d=>d+'요일').includes(a)||DAY_EN_FULL.includes(a);}
+    function makeChoices(answer,extras){
+      const out=[answer];(extras||[]).forEach(x=>{if(x&&!out.includes(x))out.push(x);});
+      const rnd=a=>a.slice().sort(()=>rng()-0.5);
+      if(isWeekdayAns(answer)){
+        const list=config.english?DAY_EN_FULL:DAY_KO.map(d=>d+'요일');const ai=list.indexOf(answer);
+        for(const o of rnd([1,2,3,4,5,6])){const c=list[(ai+o)%7];if(!out.includes(c))out.push(c);if(out.length>=4)break;}
+      } else if(answer==='윤년'||answer==='평년'){return ['윤년','평년'];}
+      else if(['봄','여름','가을','겨울'].includes(answer)){return rnd(['봄','여름','가을','겨울']);}
+      else if(/^\d+월 \d+일$/.test(answer)){
+        const m=+answer.match(/(\d+)월/)[1], d=+answer.match(/(\d+)일/)[1];
+        for(const o of rnd([1,-1,2,-2,7,-7,3,-3])){const nd=d+o;if(nd>=1&&nd<=28){const c=`${m}월 ${nd}일`;if(!out.includes(c))out.push(c);}if(out.length>=4)break;}
+      } else if(/^\d+주 \d+일$/.test(answer)){
+        const w=+answer.match(/(\d+)주/)[1], d=+answer.match(/(\d+)일/)[1];
+        for(const c of rnd([`${w}주 ${(d+1)%7}일`,`${w+1}주 ${d}일`,`${w}주 ${(d+2)%7}일`,`${Math.max(0,w-1)}주 ${d}일`])){if(!out.includes(c))out.push(c);if(out.length>=4)break;}
+      } else if(/^\d+년 \d+개월$/.test(answer)){
+        const y=+answer.match(/(\d+)년/)[1], mo=+answer.match(/(\d+)개월/)[1];
+        for(const c of rnd([`${y}년 ${(mo%11)+1}개월`,`${y+1}년 ${mo}개월`,`${Math.max(0,y-1)}년 ${mo}개월`,`${y}년 ${((mo+5)%11)+1}개월`])){if(c!==answer&&!out.includes(c))out.push(c);if(out.length>=4)break;}
+      } else if(/^\d+(일|주|개월|년|시간|번|살)$/.test(answer)){
+        const u=answer.match(/(일|주|개월|년|시간|번|살)$/)[1], v=parseInt(answer);
+        let offs=u==='일'?[7,-7,1,-1,2,-2,14]:u==='주'?[1,-1,2,-2,3]:u==='개월'?[12,-12,1,-1,6,-6]:u==='년'?[1,-1,2,-2]:u==='시간'?[24,-24,12,-12]:u==='살'?[1,-1,2,-2,3]:[1,-1,2,-2,3];
+        for(const o of rnd(offs)){const nv=v+o;if(nv>0){const c=nv+u;if(!out.includes(c))out.push(c);}if(out.length>=4)break;}
+      } else {
+        for(const o of rnd([1,-1,2,-2,3,-3])){const nv=(parseInt(answer)||0)+o;if(nv>0){const c=String(nv);if(!out.includes(c))out.push(c);}if(out.length>=4)break;}
+      }
+      while(out.length<4){const pad=isWeekdayAns(answer)?(config.english?DAY_EN_FULL:DAY_KO.map(d=>d+'요일'))[randInt(0,6)]:String(randInt(1,30))+'일';if(!out.includes(pad))out.push(pad);}
+      return out.slice(0,4).sort(()=>rng()-0.5);
+    }
+
+    // ───────── 문제 생성 ─────────
+    function buildQuestion(num,type,style){
+      const isN=style==='narrative';
+      const raw=pick(NAMES);const name=getDisplayName(raw),josaEun=selJosa(raw,'eun'),josaI=selJosa(raw,'i');
+      let questionText='',answer='',choices=[],viz={kind:'none'},extras=[];
+      const yr=pickYear();const showYear=(config.yearMode==='real');
+
+      // ── 달력 읽기: 여러 형식 ──
+      if(type==='read'){
+        const m=pickMonth();const last=dim(yr,m);
+        let mode=pick([1,2,5]);
+        if(mode===1){ // 날짜→요일
+          const day=randInt(1,last);answer=dowName(dowOf(yr,m,day),true);
+          questionText=isN?fillTpl(pick(NARR.read1),raw,{y:yearTxt(yr),m,day}):`달력에서 <b>${yearTxt(yr)}${m}월 ${day}일</b>은 무슨 요일입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[day]:'a'}};
+        } else if(mode===2){ // 첫날/마지막날 요일
+          const lastDay=rng()<0.5;const day=lastDay?last:1;answer=dowName(dowOf(yr,m,day),true);
+          questionText=`달력에서 <b>${yearTxt(yr)}${m}월</b>의 <b>${lastDay?'마지막 날':'첫째 날(1일)'}</b>은 무슨 요일입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[day]:'a'}};
+        } else { // 다음 같은 요일
+          const day=randInt(1,Math.max(1,last-7));const tdw=dowOf(yr,m,day);
+          answer=`${day+7}일`;
+          questionText=isN?fillTpl(pick(NARR.read5),raw,{y:yearTxt(yr),m,day,dw:dayWordKo(tdw)}):`<b>${yearTxt(yr)}${m}월 ${day}일</b>은 ${dayWordKo(tdw)}입니다. 바로 <b>다음 ${dayWordKo(tdw)}</b>은 며칠입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[day]:'a',[day+7]:'ans'}};
+        }
+      }
+      // ── 몇 번째 / 몇째 주 요일 ──
+      else if(type==='ordinalDay'){
+        const m=pickMonth();const last=dim(yr,m);
+        const ws=config.monStart?1:0;const firstCol=((dowOf(yr,m,1)-ws)+7)%7;
+        const rowOf=dd=>Math.floor((firstCol+dd-1)/7);
+        const sub=pick([1,2,3]);
+        if(sub===1){ // n번째 ○요일 → 며칠
+          const tdw=randInt(0,6);const days=[];for(let i=1;i<=last;i++)if(dowOf(yr,m,i)===tdw)days.push(i);
+          const n=randInt(1,days.length);answer=`${days[n-1]}일`;
+          questionText=isN?fillTpl(pick(NARR.ord1),raw,{y:yearTxt(yr),m,ord:ORD_KO[n],dw:dayWordKo(tdw)}):`달력에서 <b>${yearTxt(yr)}${m}월</b>의 <b>${ORD_KO[n]} ${dayWordKo(tdw)}</b>은 며칠입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[days[n-1]]:'ans'}};
+        } else if(sub===2){ // 며칠 → 몇 번째 ○요일
+          const day=randInt(1,last);const tdw=dowOf(yr,m,day);let cnt=0;for(let i=1;i<=day;i++)if(dowOf(yr,m,i)===tdw)cnt++;
+          answer=`${ORD_KO[cnt]} ${dayWordKo(tdw)}`;
+          questionText=`달력에서 <b>${yearTxt(yr)}${m}월 ${day}일</b>은 그 달의 <b>몇 번째 ${dayWordKo(tdw)}</b>입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[day]:'a'}};style='subjective';
+        } else { // 몇째 주 ○요일 → 며칠
+          const tdw=randInt(0,6);const cand=[];for(let i=1;i<=last;i++)if(dowOf(yr,m,i)===tdw)cand.push({dd:i,wk:rowOf(i)+1});
+          const c=pick(cand);answer=`${c.dd}일`;
+          questionText=isN?fillTpl(pick(NARR.ord3),raw,{y:yearTxt(yr),m,wk:ORD_KO[c.wk],dw:dayWordKo(tdw)}):`달력에서 <b>${yearTxt(yr)}${m}월 ${ORD_KO[c.wk]} 주 ${dayWordKo(tdw)}</b>은 며칠입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[c.dd]:'ans'}};
+        }
+      }
+      // ── 한 달의 특정 요일: 수 세기 / 날짜 모두 쓰기 ──
+      else if(type==='weekendCount'){
+        const m=pickMonth();const last=dim(yr,m);const tdw=randInt(0,6);
+        const days=[];for(let i=1;i<=last;i++)if(dowOf(yr,m,i)===tdw)days.push(i);
+        const listMode=rng()<0.4;
+        if(listMode){
+          answer=days.join(', ')+'일';
+          questionText=`달력에서 <b>${yearTxt(yr)}${m}월</b>의 <b>${dayWordKo(tdw)}</b>은 모두 며칠입니까? (날짜를 모두 쓰시오.)`;style='subjective';
+        } else {
+          answer=`${days.length}번`;
+          questionText=isN?fillTpl(pick(NARR.count),raw,{y:yearTxt(yr),m,dw:dayWordKo(tdw)}):`<b>${yearTxt(yr)}${m}월</b>에 <b>${dayWordKo(tdw)}</b>은 모두 몇 번 있습니까?`;
+        }
+        const hl={};days.forEach(x=>hl[x]='ans');viz={kind:'month',y:yr,m,hl};
+      }
+      // ── 달력 빈칸 채우기 ──
+      else if(type==='fillCal'){
+        const m=pickMonth();const last=dim(yr,m);
+        const nBlank=pick([2,3]);const blanks=[];while(blanks.length<nBlank){const v=randInt(2,last-1);if(!blanks.includes(v))blanks.push(v);}
+        blanks.sort((a,b)=>a-b);answer=blanks.map(x=>x+'일').join(', ');
+        questionText=`달력의 <b>빈칸</b>에 알맞은 날짜를 써넣으시오.`;
+        const hl={};blanks.forEach(x=>hl[x]='blank');viz={kind:'month',y:yr,m,hl};style='subjective';
+      }
+      // ── 달력 규칙: 가로·세로 ──
+      else if(type==='pattern_line'){
+        const m=pickMonth();const last=dim(yr,m);
+        const sub=pick(['h','v','block']);
+        let grid,qr,qc,hint;
+        if(sub==='v'){ const len=pick([3,4]);const tl=randInt(1,Math.max(1,last-(len-1)*7));
+          grid=[];for(let r=0;r<len;r++){const v=tl+r*7;grid.push([v<=last?v:null]);}
+          const cands=[];grid.forEach((row,r)=>{if(row[0]!=null)cands.push(r);});qr=pick(cands);qc=0;hint='↓ +7';
+        } else if(sub==='h'){ const len=pick([3,4]);const s=randInt(1,Math.max(1,last-(len-1)));
+          grid=[Array.from({length:len},(_,c)=>(s+c<=last?s+c:null))];
+          const cands=[];grid[0].forEach((v,c)=>{if(v!=null)cands.push(c);});qc=pick(cands);qr=0;hint='→ +1';
+        } else { const tl=randInt(1,Math.max(1,last-7-2));
+          grid=[];for(let r=0;r<2;r++){const row=[];for(let c=0;c<3;c++){const v=tl+r*7+c;row.push(v<=last?v:null);}grid.push(row);}
+          const cands=[];grid.forEach((row,r)=>row.forEach((v,c)=>{if(v!=null)cands.push([r,c]);}));const pr=pick(cands);qr=pr[0];qc=pr[1];hint='→ +1, ↓ +7';
+        }
+        answer=`${grid[qr][qc]}일`;
+        questionText=`달력의 일부분입니다. 규칙을 찾아 <b>?</b>에 알맞은 날짜를 구하시오. <span class="text-[10px] text-slate-400">(${hint})</span>`;
+        viz={kind:'fragment',grid,qr,qc};
+      }
+      // ── 단위 관계: 주↔일 ──
+      else if(type==='unit_wd'){
+        const toDay=rng()<0.5;const maxW=8;
+        if(toDay){const w=randInt(1,maxW);answer=`${w*7}일`;questionText=isN?fillTpl(pick(NARR.wd2d),raw,{w}):`<b>${w}주일</b>은 모두 며칠입니까?`;}
+        else {const w=randInt(1,maxW),r=randInt(0,6);const dd=w*7+r;answer=r?`${w}주 ${r}일`:`${w}주`;questionText=isN?fillTpl(pick(NARR.d2wd),raw,{dd}):`<b>${dd}일</b>은 몇 주 며칠입니까?`;}
+      }
+      else if(type==='unit_dm'){
+        const toDay=rng()<0.5;const maxMo=12;
+        if(toDay){const mo=randInt(1,maxMo);answer=`${mo*30}일`;questionText=isN?fillTpl(pick(NARR.dm),raw,{mo}):`<b>1개월을 30일</b>로 볼 때, <b>${mo}개월</b>은 모두 며칠입니까?`;}
+        else {const mo=randInt(2,maxMo);const dd=mo*30;answer=`${mo}개월`;questionText=isN?fillTpl(pick(NARR.dmR),raw,{dd}):`<b>1개월을 30일</b>로 볼 때, <b>${dd}일</b>은 몇 개월입니까?`;}
+      }
+      else if(type==='unit_my'){
+        const toMonth=rng()<0.5;const maxY=10;
+        if(toMonth){const y=randInt(1,maxY);answer=`${y*12}개월`;questionText=isN?fillTpl(pick(NARR.y2mo),raw,{y}):`<b>${y}년</b>은 모두 몇 개월입니까?`;}
+        else {const y=randInt(1,maxY);const extra=randInt(0,11);const mo=y*12+extra;answer=extra?`${y}년 ${extra}개월`:`${y}년`;questionText=isN?fillTpl(pick(NARR.moR),raw,{mo}):`<b>${mo}개월</b>은 몇 년 몇 개월입니까?`;}
+      }
+      else if(type==='unit_dh'){
+        const toHour=rng()<0.6;const maxD=14;
+        if(toHour){const dd=randInt(1,maxD);answer=`${dd*24}시간`;questionText=isN?fillTpl(pick(NARR.d2h),raw,{dd}):`<b>${dd}일</b>은 모두 몇 시간입니까?`;}
+        else {const dd=randInt(2,maxD);answer=`${dd}일`;questionText=`<b>${dd*24}시간</b>은 며칠입니까?`;}
+      }
+      // ── 날짜 더하기/빼기 (일/주/개월) ──
+      else if(type==='add_d'||type==='add_w'||type==='add_m'){
+        const m=pickMonth();const last=dim(yr,m);
+        let startD,res,unitLabel,within;
+        if(type==='add_d'){
+          const dir=rng()<0.5?-1:1;
+          if(dir>0){startD=randInt(1,Math.max(1,last-2));const n=randInt(2,Math.max(2,last-startD));res=addDays(yr,m,startD,n);unitLabel=`${n}일 후`;}
+          else {startD=randInt(3,last);const n=randInt(2,startD-1);res=addDays(yr,m,startD,-n);unitLabel=`${n}일 전`;}
+          within=true;
+        } else if(type==='add_w'){
+          const maxW=Math.max(1,Math.floor((last-1)/7));const w=randInt(1,maxW);const dir=rng()<0.5?-1:1;
+          if(dir>0){startD=randInt(1,Math.max(1,last-7*w));res=addDays(yr,m,startD,7*w);unitLabel=`${w}주 후`;}
+          else {startD=randInt(1+7*w,last);res=addDays(yr,m,startD,-7*w);unitLabel=`${w}주 전`;}
+          within=true;
+        } else { // add_m: 같은 날짜, 다른 달 (개월 셈) — 달력 없이 푼다
+          const dir=rng()<0.5?-1:1;const mo=randInt(1,6);startD=randInt(1,28);
+          res=addMonths(yr,m,startD,dir*mo);unitLabel=`${mo}개월 ${dir>0?'후':'전'}`;within=false;
+        }
+        const askDow=(type!=='add_m')&&rng()<0.4;
+        answer=askDow?dowName(res.dow,true):`${res.m}월 ${res.d}일`;
+        const jw=josaW(unitLabel,'eun');
+        if(isN){const base=fillTpl(pick(NARR.add),raw);questionText=`${base} 시작한 날이 <b>${yearTxt(yr)}${m}월 ${startD}일</b>이라면, 그로부터 <b>${unitLabel}</b>${jw} ${askDow?'무슨 요일입니까?':'몇 월 며칠입니까?'}`;}
+        else questionText=`<b>${yearTxt(yr)}${m}월 ${startD}일</b>에서 <b>${unitLabel}</b>${jw} ${askDow?'무슨 요일입니까?':'몇 월 며칠입니까?'}`;
+        if(within){const hl={};hl[startD]='start';hl[res.d]='ans';viz={kind:'month',y:yr,m,hl};}
+      }
+      // ── 각 달의 날수 ──
+      else if(type==='daysInMonth'){
+        const sub=isN?1:pick([1,2,3]);
+        if(sub===1){const m=pickMonth();answer=`${dim(yr,m)}일`;questionText=isN?fillTpl(pick(NARR.days),raw,{y:yearTxt(yr),m}):`<b>${yearTxt(yr)}${m}월</b>은 며칠까지 있습니까?`;}
+        else if(sub===2){const m=pick([1,3,5,7,8,10,12]);answer='31일';extras=['30일','28일','29일'];questionText=`<b>${m}월</b>은 며칠까지 있습니까?`;}
+        else {answer=isLeap(yr)?'29일':'28일';extras=[isLeap(yr)?'28일':'29일','30일','31일'];questionText=`달력의 2월을 보고 <b>${yearTxt(yr)||'어느 해 '}2월</b>이 며칠까지 있는지 쓰시오.`;viz={kind:'month',y:yr,m:2,hl:{}};}
+      }
+      // ── 계절과 월 ──
+      else if(type==='season'){
+        const toSeason=isN?true:(rng()<0.6);
+        if(toSeason){const m=pickMonth();answer=SEASONS[m];questionText=isN?fillTpl(pick(NARR.season),raw,{m}):`<b>${m}월</b>은 무슨 계절입니까? (봄·여름·가을·겨울)`;}
+        else {const s=pick(['봄','여름','가을','겨울']);const mp={'봄':'3, 4, 5','여름':'6, 7, 8','가을':'9, 10, 11','겨울':'12, 1, 2'};answer=mp[s]+'월';questionText=`<b>${s}</b>에 해당하는 달을 모두 쓰시오.`;style=(style==='objective')?'subjective':style;}
+      }
+      // ── 윤년·평년 (여러 형식) ──
+      else if(type==='leap'){
+        const baseY=config.yearMode==='real'?(config.randYear?randInt(2000,2040):yr):randInt(2000,2040);
+        if(isN){answer=isLeap(baseY)?'윤년':'평년';extras=[isLeap(baseY)?'평년':'윤년'];questionText=fillTpl(pick(NARR.leap),raw,{by:baseY});}
+        else{
+        const v=pick([1,2,3,4,5]);
+        if(v===1){answer=isLeap(baseY)?'윤년':'평년';extras=[isLeap(baseY)?'평년':'윤년'];questionText=`달력의 2월을 보고 <b>${baseY}년</b>이 윤년인지 평년인지 쓰시오.`;viz={kind:'month',y:baseY,m:2,hl:{}};}
+        else if(v===2){answer=isLeap(baseY)?'29일':'28일';extras=[isLeap(baseY)?'28일':'29일','30일','31일'];questionText=`달력을 보고 <b>${baseY}년</b>의 2월이 며칠까지 있는지 쓰시오.`;viz={kind:'month',y:baseY,m:2,hl:{}};}
+        else if(v===3){answer=isLeap(baseY)?'윤년':'평년';extras=[isLeap(baseY)?'평년':'윤년'];questionText=`<b>${baseY}년</b>은 윤년입니까, 평년입니까?`;}
+        else if(v===4){answer='4년';extras=['1년','2년','100년'];questionText=`윤년은 보통 <b>몇 년마다</b> 한 번씩 돌아옵니까?`;}
+        else {let ny=baseY+1;while(!isLeap(ny))ny++;answer=`${ny}년`;questionText=`<b>${baseY}년</b> 바로 다음에 오는 <b>윤년</b>은 몇 년입니까?`;}
+        }
+      }
+      // ── 어제·오늘·내일 ──
+      else if(type==='relday'){
+        const useDate=isN?true:(rng()<0.5);const rel=pick([['어제',-1],['내일',1],['그저께',-2],['모레',2]]);
+        const rj=josaW(rel[0],'eun');
+        if(useDate){
+          const m=pickMonth();const last=dim(yr,m);const day=randInt(3,Math.max(3,last-2));const r=addDays(yr,m,day,rel[1]);
+          answer=`${r.d}일`;
+          questionText=isN?fillTpl(pick(NARR.rel),raw,{y:yearTxt(yr),m,day,rel:rel[0],rj}):`<b>오늘</b>이 ${yearTxt(yr)}${m}월 ${day}일이면, <b>${rel[0]}</b>${rj} 며칠입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[day]:'a',[r.d]:'ans'}};
+        } else {
+          const dw=randInt(0,6);const nd=((dw+rel[1])%7+7)%7;answer=dowName(nd,true);
+          questionText=`<b>오늘</b>이 ${dayWordKo(dw)}이면, <b>${rel[0]}</b>${rj} 무슨 요일입니까?`;
+        }
+      }
+      // ── 요일 순서 계산 ──
+      else if(type==='dowseq'){
+        const dw=randInt(0,6);const fwd=rng()<0.5;const n=randInt(1,6);const nd=((dw+(fwd?n:-n))%7+7)%7;answer=dowName(nd,true);
+        const dir=fwd?'후':'전';const dj=josaW(dir,'eun');
+        questionText=isN?fillTpl(pick(NARR.dow),raw,{dw:dayWordKo(dw),n,dir,dj}):`<b>${dayWordKo(dw)} ${n}일 ${dir}</b>${dj} 무슨 요일입니까?`;
+      }
+      // ── 날짜 비교·순서 나열 ──
+      else if(type==='compare'){
+        const m0=pickMonth();const ds=[];while(ds.length<3){const mm=rng()<0.3?(m0===1?12:m0-1):m0;const dd=randInt(1,dim(yr,mm));const key=mm*100+dd;if(!ds.some(x=>x.k===key))ds.push({m:mm,d:dd,k:key});}
+        const sorted=ds.slice().sort((a,b)=>a.k-b.k);const label=x=>`${x.m}월 ${x.d}일`;
+        const askEarly=rng()<0.5;
+        if(isN){answer=sorted.map(label).join(', ');questionText=fillTpl(pick(NARR.cmp),raw)+' 빠른(이른) 순서로 쓰시오.';}
+        else if(style==='objective'){
+          answer=label(askEarly?sorted[0]:sorted[2]);extras=ds.filter(x=>label(x)!==answer).map(label);
+          questionText=`아래 날짜 중 <b>${askEarly?'가장 빠른(이른)':'가장 늦은'}</b> 날짜는 언제입니까?`;
+        } else {
+          answer=sorted.map(label).join(', ');
+          questionText=`아래 날짜를 <b>빠른(이른) 순서</b>로 쓰시오.`;
+        }
+        viz={kind:'datelist',items:ds.map(label)};
+      }
+      // ── 며칠째(순서일) ──
+      else if(type==='nthday'){
+        const m=pickMonth();const last=dim(yr,m);const start=randInt(1,Math.max(1,last-6));const nth=randInt(2,Math.min(7,last-start+1));const target=start+nth-1;
+        const reverse=rng()<0.5;
+        if(reverse){answer=`${start}일`;
+          questionText=isN?fillTpl(pick(NARR.nthR),raw,{y:yearTxt(yr),m,t:target,n:nth}):`어떤 일의 <b>${nth}일째</b> 되는 날이 <b>${yearTxt(yr)}${m}월 ${target}일</b>이라면, <b>시작한 날</b>은 며칠입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[target]:'a',[start]:'ans'}};
+        } else {answer=`${target}일`;
+          questionText=isN?fillTpl(pick(NARR.nthF),raw,{y:yearTxt(yr),m,s:start,n:nth}):`<b>${yearTxt(yr)}${m}월 ${start}일</b>부터 시작한 일의 <b>${nth}일째</b> 되는 날은 며칠입니까?`;
+          viz={kind:'month',y:yr,m,hl:{[start]:'a',[target]:'ans'}};
+        }
+      }
+      // ── 반복 일정(주기) ──
+      else if(type==='recurring'){
+        const m=pickMonth();const last=dim(yr,m);const step=pick([2,3,4,7]);const start=randInt(1,Math.max(1,last-step*3));
+        const occ=[];for(let d=start;d<=last;d+=step)occ.push(d);const listMode=rng()<0.4&&occ.length<=8;
+        if(listMode){answer=occ.join(', ')+'일';
+          questionText=`<b>${yearTxt(yr)}${m}월 ${start}일</b>부터 <b>${step}일마다</b> 같은 일을 반복합니다. ${m}월에 그 일을 하는 날짜를 <b>모두</b> 쓰시오.`;style='subjective';
+          const hl={};occ.forEach(x=>hl[x]='ans');viz={kind:'month',y:yr,m,hl};
+        } else {const k=randInt(2,Math.min(4,occ.length));const tgt=occ[k-1];answer=`${tgt}일`;
+          questionText=isN?fillTpl(pick(NARR.recur),raw,{y:yearTxt(yr),m,s:start,st:step,k}):`<b>${yearTxt(yr)}${m}월 ${start}일</b>부터 <b>${step}일마다</b> 반복할 때, <b>${k}번째</b> 되는 날은 며칠입니까? <span class="text-[10px] text-slate-400">(시작한 날이 1번째)</span>`;
+          viz={kind:'month',y:yr,m,hl:{[start]:'a',[tgt]:'ans'}};
+        }
+      }
+      // ── 나이 계산 ──
+      else if(type==='agegrade'){
+        const nowY=config.yearMode==='real'?(config.randYear?randInt(2024,2032):yr):randInt(2024,2032);
+        const diff=isN?false:(rng()<0.5);
+        if(diff){const a=randInt(6,12),b=randInt(1,5);const y1=nowY-a,y2=nowY-(a+b);answer=`${b}살`;
+          questionText=`<b>${y1}년</b>에 태어난 형과 <b>${y2}년</b>에 태어난 동생의 <b>나이 차이</b>는 몇 살입니까?`;
+        } else {const age=randInt(6,14);const bornY=nowY-age;answer=`${age}살`;
+          questionText=isN?fillTpl(pick(NARR.age),raw,{b:bornY,n:nowY}):`<b>${bornY}년</b>에 태어난 사람은 <b>${nowY}년</b>에 만 몇 살입니까? <span class="text-[10px] text-slate-400">(생일은 지난 것으로 봅니다)</span>`;
+        }
+      }
+
+      if(style==='objective')choices=makeChoices(answer,extras);
+      return {num,type,style,questionText,answer,choices,viz};
+    }
+
+    const ALL_T=['read','ordinalDay','weekendCount','fillCal','pattern_line','unit_wd','unit_dm','unit_my','unit_dh','add_d','add_w','add_m','daysInMonth','season','leap','relday','dowseq','compare','nthday','recurring','agegrade'];
+    const ALL_S=['subjective','objective','narrative'];
+    const DIFF_RANK={read:1,season:1,relday:1,unit_wd:2,weekendCount:2,daysInMonth:2,fillCal:2,unit_dh:2,dowseq:2,compare:2,ordinalDay:3,unit_dm:3,unit_my:3,pattern_line:3,nthday:3,recurring:3,add_d:4,add_w:4,add_m:5,leap:5,agegrade:5};
+    const ALLOWED_STYLES={read:ALL_S,ordinalDay:ALL_S,weekendCount:ALL_S,fillCal:['subjective'],pattern_line:['subjective','objective'],unit_wd:ALL_S,unit_dm:ALL_S,unit_my:ALL_S,unit_dh:ALL_S,add_d:ALL_S,add_w:ALL_S,add_m:ALL_S,daysInMonth:ALL_S,season:ALL_S,leap:ALL_S,relday:ALL_S,dowseq:ALL_S,compare:ALL_S,nthday:ALL_S,recurring:ALL_S,agegrade:ALL_S};
+
+    const SCN_KW=['수영','피아노','태권도','발레','바이올린','축구','미술','코딩','리코더','영어',
+      '강낭콩','방울토마토','상추','텃밭','누에','식물','화분',
+      '강아지','햄스터','고양이',
+      '독서','일기','도서관','받아쓰기','단원평가','현장체험','현장학습','학예회','운동회','방학','소풍','캠프','전시회','축제','박람회','음악회','학급회의','발표회','승급','졸업','입학','사진',
+      '줄넘기','자전거','등산','산책','운동','글쓰기',
+      '봉사','재활용','청소','우유','비타민','영양제','용돈','안경',
+      '치과','병원','여행','생일','할머니','할아버지','동생','사촌','짝꿍','가족','행사','강좌','특강','대회','모임','수거'];
+    function scnKey(text){const t=text.replace(/<[^>]+>/g,'');for(const k of SCN_KW)if(t.includes(k))return k;return null;}
+
+    function buildPageQuestions(seed,pIdx){
+      rng=mulberry32(seed>>>0);
+      const qpp=config.questionsPerPage;const out=[];const seen=new Set();
+      if(config.worksheet){const wy=(config.yearMode==='real'&&!config.randYear)?config.year:randInt(2018,2032);const wm=config.randMonth?randInt(1,12):config.month;wsFixed={y:wy,m:wm};}
+      const types2=ALL_T.filter(t=>config.types.includes(t));const orderedTypes=types2.length?types2:['read'];
+      const styles2=ALL_S.filter(s=>config.styles.includes(s));const orderedStyles=styles2.length?styles2:['subjective'];
+      const pool=[];orderedTypes.forEach(t=>{let w=Math.max(1,Math.min(5,(config.typeWeights[t]||1)));for(let i=0;i<w;i++)pool.push(t);});
+      const sig=o=>o.questionText.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim()+'|'+o.answer;
+      const usedScn=new Set();
+      for(let q=0;q<qpp;q++){
+        let o=null;
+        for(let tryN=0;tryN<25;tryN++){
+          const type=pool[Math.floor(rng()*pool.length)];
+          let avail=orderedStyles.filter(s=>ALLOWED_STYLES[type].includes(s));if(!avail.length)avail=['subjective'];
+          const style=pick(avail);
+          const cand=buildQuestion(q+1,type,style);
+          const cscn=(cand.style==='narrative')?scnKey(cand.questionText):null;
+          const dupSig=seen.has(sig(cand));const dupScn=cscn&&usedScn.has(cscn);
+          if((!dupSig&&!dupScn)||tryN===24){o=cand;o._scn=cscn;break;}
+        }
+        seen.add(sig(o));if(o._scn)usedScn.add(o._scn);o.seq=q;out.push(o);
+      }
+      if(config.progression==='asc')out.sort((a,b)=>(DIFF_RANK[a.type]||2)-(DIFF_RANK[b.type]||2)||a.seq-b.seq);
+      else if(config.progression==='desc')out.sort((a,b)=>(DIFF_RANK[b.type]||2)-(DIFF_RANK[a.type]||2)||a.seq-b.seq);
+      else if(config.progression==='mix'){for(let i=out.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));const t=out[i];out[i]=out[j];out[j]=t;}}
+      out.forEach((o,i)=>{o.num=i+1;o.globalNum=pIdx*qpp+i+1;});
+      if(config.worksheet&&wsFixed){out.wsCal={y:wsFixed.y,m:wsFixed.m};const merged={};out.forEach(o=>{if(o.viz&&o.viz.kind==='month'&&o.viz.y===wsFixed.y&&o.viz.m===wsFixed.m){for(const k in (o.viz.hl||{})){const mk=o.viz.hl[k];if(mk==='a'||mk==='start')merged[k]='a';}o.viz={kind:'none'};}});out.wsHl=merged;}
+      wsFixed=null;
+      return out;
+    }
+
+    // ───────── QR 자동 채점 ─────────
+    function encodeState(seed,pIdx){
+      let tmask=0;ALL_T.forEach((t,i)=>{if(config.types.includes(t))tmask|=(1<<i);});
+      let smask=0;ALL_S.forEach((s,i)=>{if(config.styles.includes(s))smask|=(1<<i);});
+      const flags=(config.monStart?1:0)|(config.weekend?2:0)|(config.hanja?4:0)|(config.english?8:0)|(config.bigMode?16:0)|(config.boldKey?32:0)|(config.randYear?64:0)|(config.yearMode==='abstract'?128:0)|(config.randMonth?256:0)|(config.markCount?512:0)|(config.spillDates?1024:0)|(config.worksheet?2048:0)|(config.holidays?4096:0);
+      const parts=[flags,tmask,smask,config.questionsPerPage,config.pages,pIdx,(seed>>>0),config.year,config.month,({single:0,asc:1,desc:2,mix:3}[config.progression]||0)];
+      let wStr='',any=false;ALL_T.forEach(t=>{let w=Math.max(1,Math.min(5,(config.typeWeights[t]||1)));if(w!==1)any=true;wStr+=String(w);});
+      const out=parts.map(n=>n.toString(36));if(any)out.push(wStr);return out.join('-');
+    }
+    function decodeState(str){
+      const tok=str.split(/[.-]/);const p=tok.map(x=>parseInt(x,36));const flags=p[0];
+      const wStr=(tok.length>10)?tok[10]:null;const w={};ALL_T.forEach((t,i)=>{w[t]=wStr?(parseInt(wStr[i],10)||1):1;});
+      return {ms:(flags&1)?1:0,we:(flags&2)?1:0,hj:(flags&4)?1:0,en:(flags&8)?1:0,big:(flags&16)?1:0,bk:(flags&32)?1:0,ry:(flags&64)?1:0,ab:(flags&128)?1:0,rm:(flags&256)?1:0,mc:(flags&512)?1:0,sp:(flags&1024)?1:0,ws:(flags&2048)?1:0,hd:(flags&4096)?1:0,ty:ALL_T.filter((t,i)=>p[1]&(1<<i)),st:ALL_S.filter((s,i)=>p[2]&(1<<i)),qpp:p[3],pg:p[4],p:p[5],sd:(p[6]>>>0),yr:p[7]||2026,mo:p[8]||6,prog:({0:'single',1:'asc',2:'desc',3:'mix'}[p[9]]||'single'),w};
+    }
+    function applyState(s){
+      config.monStart=!!s.ms;config.weekend=!!s.we;config.hanja=!!s.hj;config.english=!!s.en;config.bigMode=!!s.big;config.boldKey=!!s.bk;config.randYear=!!s.ry;
+      config.yearMode=s.ab?'abstract':'real';config.year=s.yr;config.month=s.mo;config.randMonth=!!s.rm;config.markCount=!!s.mc;config.spillDates=!!s.sp;config.holidays=!!s.hd;config.worksheet=!!s.ws;config.progression=s.prog||'single';
+      config.styles=(s.st&&s.st.length)?s.st:['subjective'];config.types=(s.ty&&s.ty.length)?s.ty:['read'];
+      config.questionsPerPage=s.qpp;config.pages=s.pg;config.typeWeights=s.w||{};
+    }
+    function buildAnswerKeyText(pIdx){const qs=generatedPages[pIdx]||[];return qs.map(q=>`${q.globalNum}) ${q.answer}`).join('  ');}
+    function makeQRCodes(){
+      if(typeof qrcode==='undefined')return;
+      try{if(qrcode.stringToBytesFuncs&&qrcode.stringToBytesFuncs['UTF-8'])qrcode.stringToBytes=qrcode.stringToBytesFuncs['UTF-8'];}catch(e){}
+      const hosted = (QR_MODE !== 'text') && (!!ANSWER_URL || /^https?:$/.test(location.protocol));const base=hosted?(ANSWER_URL || location.href.split('#')[0]):'';
+      generatedPages.forEach((_,pIdx)=>{
+        const el=document.getElementById('qr-'+pIdx);if(!el)return;
+        const data=hosted?(base+'#k-'+encodeState(pageSeeds[pIdx],pIdx)):buildAnswerKeyText(pIdx);
+        const draw=(txt,ec)=>{const qr=qrcode(0,ec);qr.addData(txt,'Byte');qr.make();el.innerHTML=qr.createSvgTag({cellSize:4,margin:3,scalable:true});const svg=el.querySelector('svg');if(svg){svg.setAttribute('width','100%');svg.setAttribute('height','100%');svg.style.display='block';}};
+        try{draw(data,'L');}catch(e){try{draw(data,'M');}catch(e2){el.innerHTML='<span class="text-[7px] text-slate-400">QR</span>';}}
+      });
+    }
+    function tryAnswerView(){
+      const h=location.hash||'';const i=h.search(/k[-=]/);if(i<0)return false;
+      let s;try{s=decodeState(h.slice(i+2));}catch(e){return false;}if(!s||s.sd===undefined||isNaN(s.sd))return false;
+      applyState(s);answerViewMode=true;showAnswers=true;
+      generatedPages=[buildPageQuestions(s.sd>>>0,s.p)];pageSeeds=[s.sd>>>0];
+      document.body.classList.add('answer-view');setTimeout(fitAnswerView,30);renderHTML();
+      document.querySelectorAll('.answer-box').forEach(el=>{el.classList.remove('invisible','opacity-0');el.classList.add('visible','opacity-100');});
+      const cont=document.getElementById('print-pages-container');
+      if(cont)cont.insertAdjacentHTML('afterbegin','<div class="max-w-[840px] mx-auto mb-3 bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold flex items-center justify-between"><span>✔ 정답지 (채점용) — made by 특수교사 슬옹쌤</span></div>');
+      tryIcons();return true;
+    }
+
+    function readOptions(){
+      const g=id=>document.getElementById(id);
+      config.progression=(g('progression')||{}).value||'single';
+      config.yearMode=document.querySelector('input[name="year-mode"]:checked').value;
+      config.year=parseInt(g('year-input').value)||2026;config.randYear=g('opt-randyear').checked;
+      config.month=Math.min(12,Math.max(1,parseInt(g('month-input').value)||6));config.randMonth=g('opt-randmonth').checked;
+      config.monStart=g('opt-monstart').checked;config.weekend=g('opt-weekend').checked;
+      config.hanja=g('opt-hanja').checked;config.english=g('opt-english').checked;config.bigMode=g('opt-big').checked;config.boldKey=g('opt-boldkey').checked;
+      config.markCount=g('opt-markcount').checked;config.spillDates=g('opt-spill').checked;
+      config.holidays=g('opt-holiday')?g('opt-holiday').checked:false;config.worksheet=g('opt-worksheet')?g('opt-worksheet').checked:false;
+      config.typeWeights={};document.querySelectorAll('.type-weight').forEach(i=>config.typeWeights[i.dataset.type]=Math.max(1,Math.min(5,parseInt(i.value)||1)));
+      const st=[];if(g('style-subjective').checked)st.push('subjective');if(g('style-objective').checked)st.push('objective');if(g('style-narrative').checked)st.push('narrative');
+      config.styles=st.length?st:['subjective'];if(!st.length)g('style-subjective').checked=true;
+      const ty=[];document.querySelectorAll('.type-checkbox:checked').forEach(e=>ty.push(e.value));
+      config.types=ty.length?ty:['read'];if(!ty.length)document.querySelector('.type-checkbox').checked=true;
+    }
+    function onYearModeChange(){
+      const real=document.querySelector('input[name="year-mode"]:checked').value==='real';
+      const el=document.getElementById('ym-inputs');if(el)el.style.display=real?'':'none';
+      const hb=document.getElementById('holiday-row');if(hb)hb.style.display=real?'':'none';
+      regenerateSheet();
+    }
+    function toggleGroup(cb,gid){const g=document.getElementById(gid);if(g)g.querySelectorAll('.type-checkbox').forEach(x=>{x.checked=cb.checked;});regenerateSheet();}
+    function syncGroupToggles(){document.querySelectorAll('.group-toggle').forEach(gt=>{const g=document.getElementById(gt.dataset.grp);if(!g)return;const items=[...g.querySelectorAll('.type-checkbox')];gt.checked=items.length>0&&items.every(x=>x.checked);});}
+    function regenerateSheet(){
+      syncGroupToggles();readOptions();generatedPages=[];pageSeeds=[];
+      const base=((Date.now()^Math.floor(Math.random()*0x1000000))&0xFFFFFF)>>>0;
+      for(let p=0;p<config.pages;p++){const sd=(base+p*0x9E3779B1)>>>0;pageSeeds.push(sd);generatedPages.push(buildPageQuestions(sd,p));}
+      renderHTML();tryIcons();
+    }
+
+    // ───────── 달력 표 렌더 ─────────
+    function renderMonth(y,m,hl,size){
+      const last=dim(y,m);const startDow=dowOf(y,m,1);const ws=config.monStart?1:0;
+      const names=config.english?DAY_EN:(config.hanja?DAY_HANJA:DAY_KO);
+      const order=[];for(let i=0;i<7;i++)order.push((ws+i)%7);
+      const big=config.bigMode||size==='big'||size==='huge';const huge=size==='huge';
+      const cellH=huge?'h-8':big?'h-6':'h-[18px]';const fs=huge?'text-[15px]':big?'text-[13px]':'text-[11px]';const cir=huge?'w-7 h-7':big?'w-6 h-6':'w-[18px] h-[18px]';const numW='font-semibold';
+      const sunC='text-red-500',satC='text-blue-500',plainHead='text-slate-500',plainCell='text-slate-800';
+      let head='';order.forEach(dw=>{const c=dw===0?sunC:dw===6?satC:plainHead;head+=`<th class="${fs} font-bold ${config.weekend?c:plainHead} pb-0">${names[dw]}</th>`;});
+      const prevM=m===1?12:m-1,prevY=m===1?y-1:y,prevLast=dim(prevY,prevM);
+      const lead=((startDow-ws)+7)%7;
+      let cells=[];for(let i=lead;i>0;i--)cells.push({v:prevLast-i+1,sp:true});for(let dd=1;dd<=last;dd++)cells.push({v:dd,sp:false});
+      const trail=(7-(cells.length%7))%7;for(let i=1;i<=trail;i++)cells.push({v:i,sp:true});
+      let rows='';for(let i=0;i<cells.length;i+=7){let tr='';for(let j=0;j<7;j++){const cell=cells[i+j];
+        if(cell.sp){ tr+=`<td class="${cellH} text-center align-middle">${config.spillDates?`<span class="text-slate-300 ${fs}">${cell.v}</span>`:''}</td>`;continue;}
+        const v=cell.v;const dw=(ws+j)%7;const hol=holidayName(m,v);
+        const wkc=hol?sunC:(config.weekend?(dw===0?sunC:dw===6?satC:plainCell):plainCell);
+        const mark=hl&&hl[v];let inner=`<span class="${wkc} ${fs} ${numW}">${v}</span>`;
+        if(mark==='blank'){inner=showAnswers?`<span class="inline-flex items-center justify-center ${cir} rounded-full bg-red-500 text-white font-black ${fs}">${v}</span>`:`<span class="inline-flex items-center justify-center ${cir} rounded border border-slate-400 bg-amber-50">&nbsp;</span>`;}
+        else if(mark==='ans'){inner=showAnswers?`<span class="inline-flex items-center justify-center ${cir} rounded-full bg-rose-500 text-white font-black ${fs}">${v}</span>`:`<span class="${wkc} ${fs} ${numW}">${v}</span>`;}
+        else if(mark){const st=mark==='a'?'bg-amber-400':mark==='start'?'bg-emerald-500':mark==='end'?'bg-rose-400':'bg-green-300';
+          if(mark==='span')inner=`<span class="inline-flex items-center justify-center ${cir} rounded ${showAnswers?'bg-green-100':''} ${wkc} ${fs}">${v}</span>`;
+          else if(showAnswers)inner=`<span class="inline-flex items-center justify-center ${cir} rounded-full ${st} text-white font-black ${fs}">${v}</span>`;
+          else if(config.markCount)inner=`<span class="inline-flex items-center justify-center ${cir} rounded-full ring-2 ring-green-600 text-green-700 font-bold ${fs}">${v}</span>`;
+          else inner=`<span class="${wkc} ${fs} ${numW}">${v}</span>`;}
+        tr+=`<td class="${cellH} text-center align-middle">${inner}</td>`;}
+        rows+=`<tr>${tr}</tr>`;}
+      const wbox=huge?'max-w-[380px]':big?'max-w-[230px]':'max-w-[188px]';
+      return `<div class="my-0.5 flex flex-col items-center"><div class="${fs} font-extrabold text-slate-700 leading-tight">${yearTxt(y)}${m}월</div><table class="w-full ${wbox} border border-slate-200 rounded-lg overflow-hidden" style="table-layout:fixed"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    function renderFragment(v){
+      const big=config.bigMode;const sz=big?'w-9 h-9 text-[13px]':'w-7 h-7 text-[11px]';
+      let rows='';v.grid.forEach((row,r)=>{let tr='';row.forEach((val,c)=>{
+        const isQ=(r===v.qr&&c===v.qc);let cell;
+        if(val==null)cell='<td></td>';
+        else if(isQ)cell=`<td class="p-0.5"><span class="inline-flex items-center justify-center ${sz} rounded border-2 border-rose-400 bg-rose-50 font-black ${showAnswers?'text-red-500':'text-rose-400'}">${showAnswers?val:'?'}</span></td>`;
+        else cell=`<td class="p-0.5"><span class="inline-flex items-center justify-center ${sz} rounded border border-slate-300 bg-slate-50 font-bold text-slate-700">${val}</span></td>`;
+        tr+=cell;});rows+=`<tr>${tr}</tr>`;});
+      return `<div class="my-1 flex justify-center"><table class="border-collapse"><tbody>${rows}</tbody></table></div>`;
+    }
+    function renderDateList(items){
+      const tags='㉮㉯㉰㉱㉲㉳';
+      return `<div class="my-1.5 flex flex-wrap justify-center gap-1.5">${items.map((d,i)=>`<span class="inline-flex items-center gap-1 border border-slate-300 rounded-md px-2 py-1 bg-slate-50 text-[11px] font-bold text-slate-700"><span class="text-[10px] text-green-700">${tags[i]||(i+1)}</span>${d}</span>`).join('')}</div>`;
+    }
+    function renderViz(q){
+      if(!q.viz||q.viz.kind==='none')return `<div class="my-1.5 min-h-[40px]"></div>`;
+      if(q.viz.kind==='month')return renderMonth(q.viz.y,q.viz.m,q.viz.hl);
+      if(q.viz.kind==='fragment')return renderFragment(q.viz);
+      if(q.viz.kind==='datelist')return renderDateList(q.viz.items);
+      return '';
+    }
+
+    // ───────── 학습지 HTML ─────────
+    function getGrade(type){
+      if(['leap','add_m','agegrade'].includes(type))return '초등 3학년';
+      if(['unit_dm','unit_my','add_d','add_w','ordinalDay','weekendCount','pattern_line','nthday','recurring','compare'].includes(type))return '초등 2학년';
+      return '초등 1~2학년';
+    }
+
+    // 카드 내용이 넘칠 때 자동으로 조금씩 줄여 맞춤(잘림 방지)
+    function fitCards(){document.querySelectorAll('.print-area > div.grid > div').forEach(function(card){var inner=card.children[0];if(!inner)return;inner.style.zoom='';var z=1,g=0;while(card.scrollHeight-card.clientHeight>1&&z>0.5&&g++<14){z=Math.max(0.5,z-0.05);inner.style.zoom=z;}});}
+    function renderHTML(){
+      const c=document.getElementById('print-pages-container');if(!c)return;c.innerHTML='';
+      generatedPages.forEach((questions,pIdx)=>{
+        const page=document.createElement('div');
+        page.className="bg-white p-5 md:p-6 shadow-lg border border-slate-200 rounded-2xl print-area max-w-[840px] mx-auto h-[1180px] overflow-hidden flex flex-col"+(config.bigMode?" big-mode":"");
+        const sBadges=ALL_S.map(s=>{const on=config.styles.includes(s);return `<span class="${on?'bg-green-700 text-white border-green-700 font-bold':'bg-slate-50 text-slate-400 border-slate-200'} border px-1.5 py-0.2 rounded text-[9px]">${KOREAN_STYLES[s]}</span>`;}).join('');
+        const tBadgeList=ALL_T.map(t=>{const on=config.types.includes(t);return `<span class="${on?'bg-green-700 text-white border-green-700 font-bold':'bg-slate-50 text-slate-400 border-slate-200'} border px-1.5 py-0.2 rounded text-[9px] whitespace-nowrap">${KOREAN_TYPES[t]}</span>`;});
+        const tRows=[];for(let i=0;i<tBadgeList.length;i+=6)tRows.push(`<div class="flex gap-1 flex-wrap">${tBadgeList.slice(i,i+6).join('')}</div>`);
+        const yearLbl=config.yearMode==='real'?(config.randYear?'실제 연도(무작위)':`실제 ${config.year}년`):'추상 달력';
+        const monthLbl=config.randMonth?'월 무작위':`${config.month}월 고정`;
+        const progLbl={single:'단일',asc:'쉬움→어려움',desc:'어려움→쉬움',mix:'혼합'}[config.progression]||'단일';
+        const pageNum=pIdx+1;
+        const qrBlock=`<div class="flex flex-col items-center gap-0.5 shrink-0"><div id="qr-${pIdx}" class="w-[100px] h-[100px] bg-white border border-slate-200 rounded p-1 flex items-center justify-center overflow-hidden"></div><span class="text-[8px] text-slate-500 font-bold leading-none">정답 QR (스캔)</span></div>`;
+        let header=`<div class="border-b-2 border-slate-800 pb-2 mb-2">
+          <div class="flex justify-between items-start gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="bg-green-700 text-white text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full">PAGE ${pageNum}</span>
+                <h1 class="text-xl font-extrabold tracking-tight text-slate-900">달력보기 맞춤형 학습지</h1>
+                <span class="text-[10px] font-bold text-green-700 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">made by 특수교사 슬옹쌤</span>
+              </div>
+              <div class="flex flex-col gap-1.5 mt-2.5 text-[10px] items-start">
+                <div class="flex flex-wrap items-center gap-1"><span class="font-extrabold text-slate-600 text-[9px] uppercase">문항 방식:</span>${sBadges}</div>
+                <div class="flex items-start gap-1"><span class="font-extrabold text-slate-600 text-[9px] uppercase pt-0.5">세부 유형:</span><div class="flex flex-col gap-1">${tRows.join('')}</div></div>
+              </div>
+            </div>
+            <div class="flex items-start gap-2 shrink-0">
+              <div class="text-right text-[10px] text-slate-600 space-y-0.5 bg-slate-50 border border-slate-200 p-2.5 rounded-xl font-medium">
+                <div>출력 일자: ${config.dateStr}</div><div>연도: ${yearLbl}</div><div>월: ${monthLbl}</div><div>배치: ${progLbl}</div><div>총 문항수: ${config.questionsPerPage}문항</div>
+              </div>
+              ${qrBlock}
+            </div>
+          </div>
+        </div>`;
+        const ws=config.worksheet&&questions.wsCal;
+        const wsCalBlock=ws?`<div class="flex flex-col items-center mb-3 pb-3 border-b border-slate-200 shrink-0"><div class="text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 mb-2">📅 이 달력을 보고 문제를 풀어요</div><div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3">${renderMonth(questions.wsCal.y,questions.wsCal.m,config.markCount?(questions.wsHl||{}):{},'huge')}</div></div>`:'';
+        const cols=config.bigMode?2:3;const gridRows=Math.max(1,Math.ceil(config.questionsPerPage/cols));
+        let grid=`<div class="grid gap-2.5 flex-1 min-h-0" style="grid-template-columns:repeat(${cols},minmax(0,1fr));grid-template-rows:repeat(${gridRows},minmax(0,1fr));">`;
+        questions.forEach(q=>{
+          const gi=q.globalNum;const lvl=getGrade(q.type);const disp=renderViz(q);
+          let ans;
+          if(q.style==='objective'){
+            const long=Math.max(...q.choices.map(x=>String(x).length))>9;
+            ans=`<div class="mt-1.5"><div class="grid ${long?'grid-cols-1':'grid-cols-2'} gap-x-1 gap-y-0.5">${q.choices.map((ch,i)=>`<div class="${long?'text-[10px]':'text-[11px]'} text-slate-500 flex items-start gap-1"><span class="inline-block w-3.5 h-3.5 shrink-0 rounded-full border border-slate-300 text-[9px] text-center leading-3.5 font-bold">${i+1}</span><span class="${long?'flex-1 break-keep leading-tight':'truncate max-w-[110px]'}">${ch}</span></div>`).join('')}</div><div class="mt-1 text-[9px] border-t border-slate-100 pt-0.5 text-slate-400">정답 기입: ( <span class="answer-box ${showAnswers?'visible text-red-500 font-bold text-xs':'invisible opacity-0'}">${q.choices.indexOf(q.answer)+1}</span> )</div></div>`;
+          } else {
+            ans=`<div class="mt-1.5 border-b border-dashed border-slate-300 pb-0.5 flex items-baseline"><span class="text-[9px] text-slate-400 font-semibold mr-1">정답 :</span><span class="answer-box text-[11px] font-extrabold text-red-500 pl-0.5 ${showAnswers?'visible':'invisible opacity-0'}">${q.answer}</span></div>`;
+          }
+          let qt=q.questionText;if(!config.boldKey)qt=qt.replace(/<\/?b>/g,'');
+          grid+=`<div class="flex flex-col justify-between border border-slate-200 p-2 rounded-xl bg-white relative overflow-hidden min-h-0 min-w-0">
+            <div class="min-h-0"><div class="flex justify-between items-center w-full mb-0.5"><span class="font-black text-green-700 text-xs md:text-sm">${gi}.</span><span class="text-[7.5px] bg-slate-100 text-slate-500 border border-slate-200 px-1 rounded font-bold">${lvl}</span></div>
+            <p class="qtext-el text-[11.5px] md:text-xs font-medium text-slate-900 leading-normal">${qt}</p>${disp}</div>
+            <div>${ans}</div></div>`;
+        });
+        grid+=`</div>`;
+        const wm=`<div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[8px] text-slate-300"><span>ⓒ made by 특수교사 슬옹쌤 · 달력보기 학습지 자동 생성</span><span>PAGE ${pageNum} / ${config.pages}</span></div>`;
+        page.innerHTML=header+wsCalBlock+grid+wm;c.appendChild(page);
+      });
+      try{fitCards();}catch(e){}
+      makeQRCodes();
+    }
+
+    // ───────── 컨트롤 ─────────
+    function tryIcons(){try{if(typeof lucide!=='undefined'&&lucide.createIcons)lucide.createIcons();}catch(e){}}
+    function initDate(){const t=new Date();config.dateStr=`${t.getFullYear()}년 ${String(t.getMonth()+1).padStart(2,'0')}월 ${String(t.getDate()).padStart(2,'0')}일`;}
+    function setPagesDropdown(v){config.pages=parseInt(v);regenerateSheet();}
+    function updateQuestionsCount(v){document.getElementById('num-of-questions-val').innerText=v+'개';config.questionsPerPage=parseInt(v);regenerateSheet();}
+    function toggleAnswers(){
+      showAnswers=!showAnswers;const at=document.getElementById('ans-text'),ei=document.getElementById('eye-icon');
+      if(showAnswers){at.innerText='답안 정답 숨기기';ei.setAttribute('data-lucide','eye-off');}else{at.innerText='답안 정답 보이기';ei.setAttribute('data-lucide','eye');}
+      renderHTML();tryIcons();
+    }
+    function setupTypeWeights(){
+      document.querySelectorAll('.type-checkbox').forEach(cb=>{const label=cb.closest('label');if(!label||label.querySelector('.type-weight'))return;
+        const inp=document.createElement('input');inp.type='number';inp.min='1';inp.max='5';inp.value='1';
+        inp.className='type-weight ml-auto w-9 text-[10px] text-center border border-slate-200 rounded px-0.5 py-0.5';inp.dataset.type=cb.value;inp.title='출제 비중(1~5)';
+        inp.addEventListener('click',e=>e.stopPropagation());inp.addEventListener('input',()=>regenerateSheet());label.appendChild(inp);});
+    }
+    function printSheet(){try{if(window.self!==window.top){window.parent.focus();window.parent.print();return;}}catch(e){}try{window.focus();window.print();}catch(e){}}
+
+    window.regenerateSheet=regenerateSheet;window.toggleAnswers=toggleAnswers;window.printSheet=printSheet;
+    window.setPagesDropdown=setPagesDropdown;window.updateQuestionsCount=updateQuestionsCount;
+    window.onYearModeChange=onYearModeChange;window.toggleGroup=toggleGroup;
+    function initApp(){initDate();if(tryAnswerView())return;setupTypeWeights();onYearModeChange();}
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initApp);else initApp();
+  </script>
+</body>
+</html>
